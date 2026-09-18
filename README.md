@@ -13,6 +13,12 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
   site, drops your message and files into the site's own chat box, and presses send. Models, tools, projects and
   history work as usual. You can pick a folder for the new chat, or leave it on `auto`. Turn off *send right away*
   if you want to pick a model before sending.
+- **Read and reply on paper.** Open a chat from a folder and it's printed on a sheet in that folder's color: your
+  messages, the model's answers (with lists, code and tables), and replies streaming in live. Reply from the chat box at
+  the bottom. Skin copies the text from the site's page into its own simple markup, and never uses the site's HTML.
+  `open in Claude ↗` shows the usual view (for artifacts, images and so on).
+- **Folders and chats.** Rename a folder by clicking its title. Move a chat to any folder, or to a new one
+  (`+ new folder…`). `×` removes a chat from Skin, with undo. It stays in Claude, and you delete it for good there.
 - **Sheets that fit.** The more folders you have, the smaller the sheets get, so the whole board fits above the chat box.
   When the sheets get too small to read, folders that mean similar things stack into piles (paperwork,
   work & making, mind, living). Stacking can be set to `auto`, `on` or `off`.

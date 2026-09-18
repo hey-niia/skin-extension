@@ -9,7 +9,9 @@
   nav a{display:block;padding:6px 8px;color:#333;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   nav a:hover{background:#eae8e0}
   .page{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
-  #thread{color:#666;max-width:600px;white-space:pre-wrap}
+  #thread{color:#333;width:min(640px,100%);overflow:auto;max-height:60vh;display:flex;flex-direction:column;gap:12px}
+  [data-testid="user-message"]{align-self:flex-end;background:#e8e4da;padding:8px 12px;border-radius:12px;white-space:pre-wrap}
+  .font-claude-response{line-height:1.5}
   .box{width:min(640px,100%);background:#fff;border:1px solid #ddd;border-radius:16px;padding:12px;display:flex;gap:8px;align-items:flex-end}
   .ProseMirror{flex:1;min-height:24px;outline:none;white-space:pre-wrap}
   #files{font-size:12px;color:#777}
@@ -45,14 +47,36 @@
     "Paper texture shader", "Component naming conventions", "Weekend in Lviv"
   ];
   const side = document.getElementById("side"), thread = document.getElementById("thread");
+  const convos = {};
+  const answer = (t) => `<p>Here's a short take on <strong>${t}</strong>.</p><ul><li>First, the main idea.</li><li>Then a detail with <code>inline code</code>.</li></ul><pre><code>const paper = "grain";</code></pre><p>More: <a href="https://example.com">a link</a>. <button>Copy</button> <span onclick="window.__evil=1" style="color:red">styled span</span></p><img alt="chart">`;
+  const show = (id) => {
+    thread.innerHTML = "";
+    for (const m of convos[id] || []) {
+      const d = document.createElement("div");
+      if (m.user) { d.dataset.testid = "user-message"; d.textContent = m.text; }
+      else { d.className = "font-claude-response"; d.innerHTML = m.html; }
+      thread.appendChild(d);
+    }
+  };
   const link = (t, id, top) => {
     const a = document.createElement("a");
     a.href = "/chat/" + id; a.textContent = t;
-    a.onclick = (e) => { e.preventDefault(); history.pushState({}, "", a.href); thread.textContent = t; };
+    convos[id] ||= [{ user: true, text: t + "?" }, { html: answer(t) }];
+    a.onclick = (e) => { e.preventDefault(); history.pushState({}, "", a.href); document.title = t + " - Claude"; show(id); };
     top ? side.insertBefore(a, side.children[2]) : side.appendChild(a);
   };
   titles.forEach((t, i) => link(t, (i + 1).toString(16).padStart(8, "0") + "-0000-4000-8000-000000000000"));
-  document.getElementById("newchat").onclick = (e) => { e.preventDefault(); history.pushState({}, "", "/new"); thread.textContent = "New chat"; };
+  document.getElementById("newchat").onclick = (e) => { e.preventDefault(); history.pushState({}, "", "/new"); thread.innerHTML = ""; };
+  // stream a reply word by word, like the real thing
+  function reply(id, text) {
+    const words = ("Thanks — got it. " + (text.length > 60 ? "That's a long one. " : "") + "Here is a considered answer, written slowly so you can watch it arrive on paper.").split(" ");
+    const m = { html: "" }; convos[id].push(m); show(id);
+    const el = thread.lastElementChild; el.dataset.isStreaming = "true";
+    let i = 0; const t = setInterval(() => {
+      if (i >= words.length) { clearInterval(t); el.dataset.isStreaming = "false"; return; }
+      m.html = "<p>" + words.slice(0, ++i).join(" ") + "</p>"; el.innerHTML = m.html;
+    }, 90);
+  }
 
   // composer that behaves roughly like the real one
   const ed = document.querySelector(".ProseMirror"), send = document.querySelector("[aria-label='Send message']"), mf = document.getElementById("mf");
@@ -61,11 +85,16 @@
   ed.addEventListener("input", sync);
   mf.addEventListener("change", () => { files = [...files, ...mf.files]; sync(); });
   send.onclick = () => {
-    const text = ed.textContent.trim(), id = Date.now().toString(16).padStart(8, "0").slice(-8) + "-0000-4000-8000-000000000001";
-    link(text.slice(0, 40) || "Untitled", id, true);
-    history.pushState({}, "", "/chat/" + id);
-    thread.textContent = "You: " + text + (files.length ? "\n(" + files.length + " file(s): " + files.map((f) => f.name).join(", ") + ")" : "");
+    const text = ed.textContent.trim() + (files.length ? "\n📎 " + files.map((f) => f.name).join(", ") : "");
+    let id = (location.pathname.match(/^\/chat\/(.+)/) || [])[1];
+    if (!id) {
+      id = Date.now().toString(16).padStart(8, "0").slice(-8) + "-0000-4000-8000-000000000001";
+      convos[id] = []; link(text.slice(0, 40) || "Untitled", id, true);
+      history.pushState({}, "", "/chat/" + id);
+    }
+    convos[id].push({ user: true, text }); show(id);
     ed.textContent = ""; files = []; sync();
+    setTimeout(() => reply(id, text), 300);
   };
 </script>
 <script src="chrome-shim.js"></script>
