@@ -446,11 +446,13 @@
 
   const SAFE = new Set(["P", "BR", "H1", "H2", "H3", "H4", "H5", "UL", "OL", "LI", "PRE", "CODE", "STRONG", "B", "EM", "I", "A", "BLOCKQUOTE", "TABLE", "THEAD", "TBODY", "TR", "TH", "TD", "HR"]);
   const SKIP = /^(button|svg|style|script|input|textarea|select|noscript|iframe|video|audio|canvas|form|label)$/i;
+  const hiddenish = (n) => n.hidden || n.getAttribute("aria-hidden") === "true" || /\b(sr-only|visually-hidden)\b/.test(n.getAttribute("class") || "")
+    || (/^H[1-6]$/.test(n.tagName) && /^(claude|you|chatgpt) (responded|said|wrote):/i.test(n.textContent.trim()));
   function clean(src) {
     const out = document.createDocumentFragment();
     for (const n of src.childNodes) {
       if (n.nodeType === 3) { out.appendChild(document.createTextNode(n.nodeValue)); continue; }
-      if (n.nodeType !== 1 || SKIP.test(n.tagName) || n.getAttribute("aria-hidden") === "true") continue;
+      if (n.nodeType !== 1 || SKIP.test(n.tagName) || hiddenish(n)) continue;
       if (n.tagName === "IMG") { out.appendChild(Object.assign(document.createElement("span"), { className: "imgnote", textContent: "[image]" })); continue; }
       if (!SAFE.has(n.tagName)) {
         const inner = clean(n);
@@ -464,6 +466,28 @@
       el.appendChild(clean(n));
       out.appendChild(el);
     }
+    return out;
+  }
+  const ANSWER = ".standard-markdown, .progressive-markdown";
+  function cleanAssistant(el) {
+    if (!el.querySelector(ANSWER)) return clean(el);
+    const out = document.createDocumentFragment(), seen = new Set();
+    const aside = (text) => {
+      const lines = [];
+      for (const x of (text || "").split("\n").map((y) => y.trim())) if (x && !seen.has(x)) { seen.add(x); lines.push(x); }
+      if (!lines.length) return;
+      out.appendChild(Object.assign(document.createElement("div"), { className: "aside", textContent: lines.join(" · ") }));
+    };
+    const walk = (node) => {
+      for (const n of node.childNodes) {
+        if (n.nodeType === 3) { aside(n.nodeValue); continue; }
+        if (n.nodeType !== 1 || hiddenish(n) || /^(svg|style|script|noscript|img|canvas|video|audio|iframe)$/i.test(n.tagName)) continue;
+        if (n.matches(ANSWER)) { const d = document.createElement("div"); d.className = "answer"; d.appendChild(clean(n)); out.appendChild(d); continue; }
+        if (n.querySelector(ANSWER)) walk(n);
+        else aside(n.innerText); // innerText skips collapsed (display:none) reasoning
+      }
+    };
+    walk(el);
     return out;
   }
   const ASSIST = '.font-claude-response, .font-claude-message, [data-testid="assistant-message"]';
@@ -490,7 +514,7 @@
         node.className = "m " + m.role;
         const prev = msgs[i - 1];
         if (!prev || prev.role !== m.role) node.appendChild(Object.assign(document.createElement("div"), { className: "who", textContent: m.role === "user" ? "you" : site.label.toLowerCase() }));
-        const body = document.createElement("div"); body.className = "body"; body.appendChild(clean(m.el)); node.appendChild(body);
+        const body = document.createElement("div"); body.className = "body"; body.appendChild(m.role === "assistant" ? cleanAssistant(m.el) : clean(m.el)); node.appendChild(body);
         hit = { len, node }; cache.set(m.el, hit);
       }
       if (box.children[i] !== hit.node) box.insertBefore(hit.node, box.children[i] || null);
@@ -1128,6 +1152,9 @@ input[type=range]{accent-color:#e9e5dc;width:150px}
 .m .body a{color:inherit;text-underline-offset:3px}
 .m .body hr{border:0;border-top:1px solid color-mix(in srgb,var(--fg) 30%,transparent);margin:1em 0}
 .imgnote{font:11px var(--mono);opacity:.6}
+.m .body .aside{font:10px/1.45 var(--mono);opacity:.55;margin:0 0 6px;letter-spacing:.01em}
+.m .body .aside::before{content:"· "}
+.m .body .aside + .answer{margin-top:10px}
 .typing{padding:0 30px;font:11px var(--mono);opacity:.65;animation:blink 1.4s ease-in-out infinite}
 @keyframes blink{50%{opacity:.25}}
 .toast.act{pointer-events:auto;display:flex;gap:14px;align-items:center}

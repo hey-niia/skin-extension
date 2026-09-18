@@ -48,7 +48,12 @@
   ];
   const side = document.getElementById("side"), thread = document.getElementById("thread");
   const convos = {};
-  const answer = (t) => `<p>Here's a short take on <strong>${t}</strong>.</p><ul><li>First, the main idea.</li><li>Then a detail with <code>inline code</code>.</li></ul><pre><code>const paper = "grain";</code></pre><p>More: <a href="https://example.com">a link</a>. <button>Copy</button> <span onclick="window.__evil=1" style="color:red">styled span</span></p><img alt="chart">`;
+  // like the real page: a screen-reader heading, a thinking summary (shown twice),
+  // a tool step, then the answer inside .standard-markdown
+  const answer = (t) => `<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Claude responded: Here's a short take on ${t}.</h2>
+    <div class="thinking"><button><span>Weighing a few directions for ${t}</span></button><div class="summary">Weighing a few directions for ${t}</div><div style="display:none">long hidden reasoning…</div></div>
+    <div class="tool">Searched the web · 4 results</div>
+    <div class="standard-markdown"><p>Here's a short take on <strong>${t}</strong>.</p><ul><li>First, the main idea.</li><li>Then a detail with <code>inline code</code>.</li></ul><pre><code>const paper = "grain";</code></pre><p>More: <a href="https://example.com">a link</a>. <button>Copy</button> <span onclick="window.__evil=1" style="color:red">styled span</span></p><img alt="chart"></div>`;
   const show = (id) => {
     thread.innerHTML = "";
     for (const m of convos[id] || []) {
