@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Mock Claude</title>
+<style>
+  body{margin:0;font:14px -apple-system,Helvetica,sans-serif;background:#f5f4ef;color:#222;display:flex;height:100vh}
+  nav{width:260px;border-right:1px solid #ddd;padding:12px;overflow:auto}
+  nav a{display:block;padding:6px 8px;color:#333;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  nav a:hover{background:#eae8e0}
+  main{flex:1;display:grid;place-items:center;color:#888}
+</style>
+</head>
+<body>
+<nav id="side"><b>Recents</b></nav>
+<main>Mock of a chat site's sidebar — for testing the Skin content script.</main>
+<script>
+  // Neutral sample titles, English + Ukrainian, like a real sidebar
+  const titles = [
+    "Visa document checklist", "Питання про посвідку на проживання", "Embassy appointment prep",
+    "Sleep routine ideas", "Питання до лікаря",
+    "Invoice template", "Податки для ФОП 3 групи", "Monthly budget",
+    "Cover letter draft", "Portfolio case study structure", "Підготовка до співбесіди",
+    "Logo color exploration", "Figma auto layout question",
+    "Python script to rename files", "React state bug", "CSS grain texture",
+    "Explain English grammar: articles", "Переклад листа",
+    "Weekend trip itinerary", "Packing list",
+    "Soup recipe", "Brainstorm app names", "Random question about cats"
+  ];
+  const side = document.getElementById("side");
+  titles.forEach((t, i) => {
+    const a = document.createElement("a");
+    const id = (i + 1).toString(16).padStart(8, "0") + "-0000-4000-8000-000000000000";
+    a.href = "/chat/" + id; a.textContent = t;
+    a.onclick = (e) => { e.preventDefault(); history.pushState({}, "", a.href); document.querySelector("main").textContent = t; };
+    side.appendChild(a);
+  });
+</script>
+<script src="chrome-shim.js"></script>
+<script src="../src/content.js"></script>
+</body>
+</html>
