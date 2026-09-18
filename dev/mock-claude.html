@@ -78,6 +78,16 @@
     }, 90);
   }
 
+  // like the real site: start typing anywhere and the site's own editor grabs focus
+  document.addEventListener("keydown", (e) => {
+    const a = document.activeElement;
+    if (e.metaKey || e.ctrlKey || e.altKey || e.key.length !== 1) return;
+    if (a && (a.tagName === "INPUT" || a.tagName === "TEXTAREA" || a.isContentEditable)) return;
+    document.querySelector(".ProseMirror").focus();
+  });
+  // …and it takes pasted files for itself
+  document.addEventListener("paste", (e) => { if (e.clipboardData?.files?.length) { e.preventDefault(); window.__sitePaste = (window.__sitePaste || 0) + 1; } });
+
   // composer that behaves roughly like the real one
   const ed = document.querySelector(".ProseMirror"), send = document.querySelector("[aria-label='Send message']"), mf = document.getElementById("mf");
   let files = [];
@@ -98,6 +108,9 @@
   };
 </script>
 <script src="chrome-shim.js"></script>
-<script src="../src/content.js"></script>
+<script>
+  // always load the latest content script while developing
+  const cs = document.createElement("script"); cs.src = "../src/content.js?" + Date.now(); document.body.appendChild(cs);
+</script>
 </body>
 </html>

@@ -238,6 +238,11 @@
   const composer = $(".composer"), ta = $(".composer textarea"), fileIn = $(".composer input[type=file]"), targetSel = $(".composer .target");
   $(".tab").onclick = () => toggle(true);
   scrim.onclick = () => setDrawer(false);
+  // Sites like claude.ai grab focus for their own editor when you type "anywhere"
+  // (they see our host div, not our textarea). Keep our typing and pasting to ourselves.
+  for (const type of ["keydown", "keyup", "keypress", "beforeinput", "input", "paste", "copy", "cut", "compositionstart", "compositionupdate", "compositionend"]) {
+    root.addEventListener(type, (e) => e.stopPropagation());
+  }
 
   let view = { name: "board" };
   const isOpen = () => !overlay.hidden;
