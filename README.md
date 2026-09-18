@@ -9,12 +9,18 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
 ## What it does
 
 - **Board of folders.** Opens on the home page, or with the `skin` tab on the right edge (`Alt+Shift+S`).
-- **Auto-sort.** Chats go into folders by words in their titles (English + Ukrainian by default).
-  Each folder has its own list of words, which you can edit in settings. You can also move any chat by hand.
-- **Privacy looks.** You can hide a folder's name and keep only its color. You can also blur its chat titles until you hover over them.
+- **Auto-sort, in three steps:**
+  1. **Words.** Each folder has a list of word stems (English, Ukrainian, Russian), which you can edit in settings.
+  2. **Your moves.** A chat you move by hand teaches Skin. Chats with similar words follow it into the
+     same folder, marked `≈ guess`, and one click on ✓ confirms the guess.
+  3. **New folder ideas.** Words that keep repeating among unsorted chats become suggested folders.
+  Everything runs in the browser. No model and no network.
+- **Privacy looks.** You can hide a folder's name and keep only its color, blur its chat titles until you hover, or turn it into a vellum envelope.
 - **Chat / Code switch.** Jump between Claude and Claude Code (`claude.ai/code`), or ChatGPT and Codex.
 - **One board, both sites.** Chats from Claude and ChatGPT are stored together, and each chat opens on its own site.
-- **4 palettes:** kraft, neon, fold, vellum. Grain, tilt, and a custom color for each folder.
+- **Same look as the [prototype](https://github.com/hey-niia/skin/tree/main/prototype):** 4 palettes (neon, kraft, fold, vellum),
+  paper grain and fibres, folded corners, and an image on any folder. Fonts are Spline Sans Mono + Instrument Sans
+  (SIL Open Font License), bundled in `fonts/`. The textures are rebuilt with `python3 dev/make-textures.py`.
 
 ## Privacy
 
@@ -45,6 +51,6 @@ python3 -m http.server 5179
 ## Limits
 
 - Site updates can break link detection (`/chat/<id>` on Claude, `/c/<id>` on ChatGPT).
-- Auto-sort uses keywords, not a model.
+- Auto-sort uses words and your moves, not a language model.
 - Anthropic's and OpenAI's consumer terms restrict automated access. Skin only reads what's already
   on the page and never fetches data in the background.
