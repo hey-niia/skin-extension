@@ -19,12 +19,14 @@
       match: [[/^\/chat\/([0-9a-f-]{36})/i, "chat"], [/^\/code\/([\w-]{6,})/i, "code"]],
       home: ["/new", "/"], chatUrl: "https://claude.ai/new", codeUrl: "https://claude.ai/code",
       codeLabel: "claude code", recents: "https://claude.ai/recents", titleSuffix: /\s*[-–|]\s*Claude\s*$/,
+      newLink: 'a[href="/new"]',
     },
     chatgpt: {
       label: "ChatGPT", host: "chatgpt.com",
       match: [[/^\/c\/([\w-]{8,})/i, "chat"], [/^\/codex\/tasks\/([\w-]{6,})/i, "code"]],
       home: ["/"], chatUrl: "https://chatgpt.com/", codeUrl: "https://chatgpt.com/codex",
       codeLabel: "codex", recents: null, titleSuffix: /\s*[-–|]\s*ChatGPT\s*$/,
+      newLink: 'a[data-testid="create-new-chat-button"], a[href="/"]',
     },
   };
   const SITE = location.hostname.endsWith("chatgpt.com") ? "chatgpt" : "claude";
@@ -38,8 +40,18 @@
     vellum: { note: "quiet, almost white",    bg: "#0a0a0a", colors: ["#ECE9E2", "#D9D5CC", "#BEB9AE", "#9A958B", "#5E5B55", "#E5DDC9", "#F1C92E"] },
   };
 
+  /* When folders stop fitting, they stack into piles by meaning. */
+  const GROUPS = {
+    paper:  { name: "paperwork" },
+    making: { name: "work & making" },
+    mind:   { name: "mind" },
+    living: { name: "living" },
+    other:  { name: "other" },
+  };
+  const GROUP_OF = { visa: "paper", health: "paper", taxes: "paper", work: "making", design: "making", code: "making", writing: "making", learning: "mind", ideas: "mind", travel: "living", life: "living", cooking: "living" };
+
   /* Word stems matched at the start of a word — English, Ukrainian, Russian. */
-  const F = (id, name, ci, kw, priv = false) => ({ id, name, ci, showName: !priv, hideTitles: priv, envelope: priv, keywords: kw });
+  const F = (id, name, ci, kw, priv = false) => ({ id, name, ci, group: GROUP_OF[id] || "other", showName: !priv, hideTitles: priv, envelope: priv, keywords: kw });
   const DEFAULT_FOLDERS = [
     F("visa", "visa", 0, "visa, віз, виз, passport, паспорт, embassy, посольств, consulate, консульств, immigra, імміграц, иммиграц, residence permit, посвідк, внж, green card, uscis, relocation, релокац", true),
     F("health", "health", 2, "health, здоров, doctor, лікар, врач, sleep, сон, symptom, симптом, medic, медич, медиц, blood, кров, therap, терап, vitamin, вітамін, витамин, pain, біль, боль, diet, дієт, диет, workout, тренуван, трениров, fitness", true),
@@ -56,7 +68,7 @@
   ];
 
   const DEFAULT_STATE = {
-    v: 2, preset: "kraft", grain: 0.38, tilt: true, envelopes: true, openOnHome: true,
+    v: 3, preset: "kraft", grain: 0.38, tilt: true, envelopes: true, openOnHome: true, stack: "auto", autoSend: true,
     folders: DEFAULT_FOLDERS,
     chats: {}, // "site:id" -> {site, kind, id, title, path, seen, folder?}
   };
@@ -207,11 +219,23 @@
       <div class="grainlayer"></div>
       <header class="bar"></header>
       <div class="view"></div>
+      <div class="composer">
+        <div class="attachments"></div>
+        <form class="cform">
+          <label class="clip" title="Add photos or files"><input type="file" multiple hidden>＋</label>
+          <textarea rows="1" placeholder="start a new thought…" aria-label="Message"></textarea>
+          <select class="target" aria-label="File the new chat in"></select>
+          <button class="send" type="submit">write</button>
+        </form>
+        <div class="chint"></div>
+      </div>
       <div class="scrim"></div>
       <aside class="drawer" aria-label="Settings"></aside>
-    </div>`;
+    </div>
+    <div class="toast" role="status"></div>`;
   const $ = (s) => root.querySelector(s);
   const overlay = $(".overlay"), bar = $(".bar"), viewEl = $(".view"), drawer = $(".drawer"), scrim = $(".scrim");
+  const composer = $(".composer"), ta = $(".composer textarea"), fileIn = $(".composer input[type=file]"), targetSel = $(".composer .target");
   $(".tab").onclick = () => toggle(true);
   scrim.onclick = () => setDrawer(false);
 
@@ -222,7 +246,7 @@
     host.style.pointerEvents = open ? "auto" : "none";
     $(".tab").style.display = open ? "none" : "";
     document.documentElement.style.overflow = open ? "hidden" : "";
-    if (open) { scan(); applyVars(); renderView(true); } else setDrawer(false);
+    if (open) { scan(); applyVars(); renderView(true); setTimeout(() => ta.focus({ preventScroll: true }), 50); } else setDrawer(false);
   }
   function setDrawer(open) {
     drawer.classList.toggle("open", open); scrim.classList.toggle("open", open);
@@ -243,7 +267,9 @@
     bar.innerHTML = `
       <div class="brand"><div class="mark">${"<i></i>".repeat(9)}</div>
         ${view.name === "folder"
-          ? `<div class="crumbs"><button data-back>← board</button><span>/</span><span>${f ? (f.showName ? esc(f.name) : "●●●") : "unsorted"}</span></div>`
+          ? `<div class="crumbs"><button data-back>← board</button>${view.gid ? `<span>/</span><button data-stackback>${esc(GROUPS[view.gid]?.name || "")}</button>` : ""}<span>/</span><span>${f ? (f.showName ? esc(f.name) : "●●●") : "unsorted"}</span></div>`
+          : view.name === "stack"
+          ? `<div class="crumbs"><button data-back>← board</button><span>/</span><span>${esc(GROUPS[view.gid]?.name || "")}</span></div>`
           : `<div class="meta"><b>skin</b><br>your conversations,<br>on paper</div>`}</div>
       <div class="seg" role="tablist" aria-label="Mode">
         <button data-go="chat" class="${onCode ? "" : "on"}">chat</button>
@@ -255,6 +281,7 @@
         <button class="x" data-close aria-label="Close">×</button>
       </div>`;
     bar.querySelector("[data-back]")?.addEventListener("click", () => go({ name: "board" }));
+    bar.querySelector("[data-stackback]")?.addEventListener("click", () => go({ name: "stack", gid: view.gid }));
     bar.querySelector("[data-close]").onclick = () => toggle(false);
     bar.querySelector("[data-settings]").onclick = () => setDrawer(!drawer.classList.contains("open"));
     bar.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => navigate(b.dataset.go === "code" ? site.codeUrl : site.chatUrl)));
@@ -284,21 +311,70 @@
         <div class="corner"></div>
       </button></div>`;
   }
+  /* the biggest sheet size at which the whole board fits above the chat box */
+  function fit(n) {
+    const narrow = innerWidth < 760, pad = narrow ? 16 : 48;
+    const W = Math.max(200, viewEl.clientWidth - pad * 2);
+    const H = Math.max(160, overlay.clientHeight - bar.offsetHeight - composer.offsetHeight - 60);
+    const gx = narrow ? 18 : 34, gy = narrow ? 26 : 40;
+    for (let w = 220; w >= 88; w -= 4) {
+      const cols = Math.max(1, Math.floor((W + gx) / (w + gx))), rows = Math.ceil(n / cols);
+      if (rows * w * 1.3 + (rows - 1) * gy <= H) return { w, gx, gy };
+    }
+    return { w: 88, gx, gy };
+  }
+  /* too many folders to fit comfortably → stack folders that mean similar things */
+  function boardItems(groups) {
+    const shown = S.folders.filter((f) => groups[f.id].length);
+    const extra = (groups.unsorted.length ? 1 : 0) + 1; // unsorted + new folder
+    let items = shown.map((f) => ({ f })), layout = fit(items.length + extra);
+    if (S.stack === "on" || (S.stack === "auto" && layout.w < 124)) {
+      const by = {};
+      for (const f of shown) (by[f.group || "other"] ||= []).push(f);
+      items = [];
+      for (const f of shown) {
+        const g = f.group || "other";
+        if (!by[g]) continue;
+        items.push(by[g].length > 1 ? { g, members: by[g] } : { f });
+        delete by[g];
+      }
+      layout = fit(items.length + extra);
+    }
+    return { items, layout };
+  }
+  function stackTileHTML(g, members, groups, i) {
+    const cols = members.map(colorOf), fg = fgFor(cols[0]);
+    const n = members.reduce((a, f) => a + groups[f.id].length, 0);
+    return `<div class="wrap stack" style="--c:${cols[0]};--fg:${fg};--c2:${cols[1]};--c3:${cols[2] || cols[1]};--r:${rot(g)}deg;--i:${i}">
+      <div class="pile p3"></div><div class="pile p2"></div><div class="shadow"></div>
+      <button class="sheet" data-stack="${esc(g)}" aria-label="${esc(GROUPS[g]?.name || g)}">
+        <div class="tex"></div><div class="name">${esc(GROUPS[g]?.name || g)}</div>
+        <div class="count">${String(n).padStart(2, "0")}</div>
+        <div class="foot"><span>${members.length} folders<br>${n} threads</span><span class="dots">${cols.map((c) => `<i style="background:${c}"></i>`).join("")}</span></div>
+        <div class="corner"></div>
+      </button></div>`;
+  }
+  const boardSection = (layout, inner) =>
+    `<section class="board ${layout.w < 130 ? "tiny" : ""}" style="--tile:${layout.w}px;--gx:${layout.gx}px;--gy:${layout.gy}px">${inner}</section>`;
   function boardHTML() {
     const { groups } = sort();
-    const shown = S.folders.filter((f) => groups[f.id].length);
+    const { items, layout } = boardItems(groups);
     const loose = groups.unsorted;
     const total = Object.keys(S.chats).length;
-    return `<section class="board">
-      ${shown.map((f, i) => tileHTML(f, groups[f.id], i)).join("")}
-      ${loose.length ? `<div class="wrap" style="--c:#2a2926;--fg:#d8d3c8;--r:-1.2deg;--i:${shown.length}"><div class="shadow"></div>
+    return boardSection(layout, `
+      ${items.map((it, i) => (it.f ? tileHTML(it.f, groups[it.f.id], i) : stackTileHTML(it.g, it.members, groups, i))).join("")}
+      ${loose.length ? `<div class="wrap" style="--c:#2a2926;--fg:#d8d3c8;--r:-1.2deg;--i:${items.length}"><div class="shadow"></div>
         <button class="sheet loose" data-open="unsorted"><div class="tex"></div><div class="name">unsorted</div>
         <div class="count">${String(loose.length).padStart(2, "0")}</div>
         <div class="foot"><span>${loose.length} to sort<br>tap to sort</span><span></span></div><div class="corner"></div></button></div>` : ""}
-      <div class="wrap flat" style="--i:${shown.length + 1}"><button class="new-sheet" data-add>+ new folder</button></div>
-    </section>
-    <p class="hint">${total ? "" : "No chats found yet. "}Skin only sees chats the page has shown.
+      <div class="wrap flat" style="--i:${items.length + 1}"><button class="new-sheet" data-add>+ new folder</button></div>`) +
+    `<p class="hint">${total ? "" : "No chats found yet. "}Skin only sees chats the page has shown.
       ${site.recents ? `<a href="${site.recents}" data-nav>Open Recents</a> and scroll down to collect older ones.` : "Scroll the sidebar to collect older ones."}</p>`;
+  }
+  function stackHTML() {
+    const { groups } = sort();
+    const members = S.folders.filter((f) => (f.group || "other") === view.gid && groups[f.id].length);
+    return boardSection(fit(members.length), members.map((f, i) => tileHTML(f, groups[f.id], i)).join(""));
   }
 
   /* ---------------- folder ---------------- */
@@ -334,7 +410,9 @@
   function renderView(enter = false) {
     renderBar();
     viewEl.classList.toggle("enter", enter);
-    viewEl.innerHTML = view.name === "folder" ? folderHTML() : boardHTML();
+    viewEl.style.paddingBottom = composer.offsetHeight + 24 + "px";
+    viewEl.innerHTML = view.name === "folder" ? folderHTML() : view.name === "stack" ? stackHTML() : boardHTML();
+    renderTargets();
     wireView();
     paintImages();
   }
@@ -342,7 +420,8 @@
 
   function wireView() {
     const q = (s) => viewEl.querySelectorAll(s);
-    q("[data-open]").forEach((b) => (b.onclick = () => go({ name: "folder", fid: b.dataset.open })));
+    q("[data-open]").forEach((b) => (b.onclick = () => go({ name: "folder", fid: b.dataset.open, gid: view.name === "stack" ? view.gid : undefined })));
+    q("[data-stack]").forEach((b) => (b.onclick = () => go({ name: "stack", gid: b.dataset.stack })));
     q("[data-nav]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); navigate(a.getAttribute("href")); }));
     q("[data-add]").forEach((b) => (b.onclick = () => addFolder()));
     q("[data-chat]").forEach((a) => {
@@ -360,7 +439,7 @@
   }
   function addFolder(name = "new folder", kw = "") {
     const id = "f" + Date.now().toString(36);
-    S.folders.push({ id, name, ci: S.folders.length, showName: true, hideTitles: false, envelope: false, keywords: kw });
+    S.folders.push({ id, name, ci: S.folders.length, group: guessGroup({ id, name, keywords: kw }), showName: true, hideTitles: false, envelope: false, keywords: kw });
     invalidate(); save(); renderView();
     if (!kw) { setDrawer(true); openFold(id); }
   }
@@ -399,6 +478,114 @@
     });
   }
 
+  /* ---------------- chat box ----------------
+   * Skin doesn't talk to the model itself. It hands your message and files to the
+   * site's own chat box on a new chat and presses send — so models, tools, projects
+   * and history all stay exactly as they are on the site.
+   */
+  let files = [];
+  const MAX_FILES = 10;
+  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  async function waitFor(fn, ms) { const end = Date.now() + ms; while (Date.now() < end) { const v = fn(); if (v) return v; await sleep(120); } return null; }
+  function toast(msg, ms = 3200) { const t = $(".toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("show"), ms); }
+
+  function renderTargets() {
+    const def = view.name === "folder" && S.folders.some((f) => f.id === view.fid) ? view.fid : "";
+    targetSel.innerHTML = `<option value="">file: auto</option>` + S.folders.map((f) => `<option value="${esc(f.id)}" ${f.id === def ? "selected" : ""}>file: ${esc(f.name)}</option>`).join("");
+    $(".chint").textContent = `opens a new chat in ${site.label} · photos & files go with it · enter to send, shift+enter for a new line`;
+  }
+  function addFiles(list) {
+    for (const f of list) { if (files.length >= MAX_FILES) { toast(`Up to ${MAX_FILES} files at once`); break; } files.push(f); }
+    renderAttachments();
+  }
+  function renderAttachments() {
+    const box = $(".attachments");
+    box.innerHTML = files.map((f, i) => `<div class="att">${f.type.startsWith("image/") ? `<canvas data-att="${i}"></canvas>` : `<span class="fname">${esc(f.name.split(".").pop() || "file")}</span>`}
+      <span class="alabel">${esc(f.name)}</span><button type="button" data-rm="${i}" aria-label="Remove ${esc(f.name)}">×</button></div>`).join("");
+    box.querySelectorAll("[data-rm]").forEach((b) => (b.onclick = () => { files.splice(+b.dataset.rm, 1); renderAttachments(); }));
+    box.querySelectorAll("canvas[data-att]").forEach(async (cv) => {
+      try {
+        const bmp = await createImageBitmap(files[+cv.dataset.att]);
+        cv.width = 96; cv.height = 96;
+        const s = Math.max(96 / bmp.width, 96 / bmp.height);
+        cv.getContext("2d").drawImage(bmp, (96 - bmp.width * s) / 2, (96 - bmp.height * s) / 2, bmp.width * s, bmp.height * s);
+      } catch {}
+    });
+    composer.classList.toggle("has-files", files.length > 0);
+    viewEl.style.paddingBottom = composer.offsetHeight + 24 + "px";
+  }
+  const grow = () => { ta.style.height = "auto"; ta.style.height = Math.min(ta.scrollHeight, 180) + "px"; };
+  ta.addEventListener("input", grow);
+  ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey && !e.isComposing) { e.preventDefault(); submit(); } });
+  ta.addEventListener("paste", (e) => { const fl = [...(e.clipboardData?.files || [])]; if (fl.length) { e.preventDefault(); addFiles(fl); } });
+  fileIn.addEventListener("change", () => { addFiles([...fileIn.files]); fileIn.value = ""; });
+  overlay.addEventListener("dragover", (e) => { if (e.dataTransfer?.types?.includes("Files")) { e.preventDefault(); composer.classList.add("drop"); } });
+  overlay.addEventListener("dragleave", (e) => { if (e.target === overlay || !overlay.contains(e.relatedTarget)) composer.classList.remove("drop"); });
+  overlay.addEventListener("drop", (e) => { if (e.dataTransfer?.files?.length) { e.preventDefault(); composer.classList.remove("drop"); addFiles([...e.dataTransfer.files]); ta.focus(); } });
+  $(".cform").addEventListener("submit", (e) => { e.preventDefault(); submit(); });
+
+  /* the site's own chat box, send button and file input */
+  const visible = (el) => el && el.getClientRects().length > 0;
+  const findEditor = () => [...document.querySelectorAll('#prompt-textarea, div.ProseMirror[contenteditable="true"], [contenteditable="true"][role="textbox"], main textarea')].find(visible);
+  const findSend = () => [...document.querySelectorAll('button[data-testid="send-button"], button[aria-label="Send message" i], button[aria-label="Send prompt" i], button[aria-label^="Send" i]')].find(visible);
+  const findFileInput = () => { const all = [...document.querySelectorAll('input[type="file"]')]; return all.find((i) => i.multiple) || all[0]; };
+  function putText(ed, text) {
+    ed.focus();
+    if (ed.tagName === "TEXTAREA") {
+      Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set.call(ed, text);
+      ed.dispatchEvent(new Event("input", { bubbles: true }));
+      return;
+    }
+    const sel = getSelection(); sel.selectAllChildren(ed); sel.collapseToEnd();
+    const dt = new DataTransfer(); dt.setData("text/plain", text);
+    const before = ed.textContent;
+    ed.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+    if (ed.textContent === before) document.execCommand("insertText", false, text); // editors that ignore synthetic paste
+  }
+  function putFiles(ed, list) {
+    const dt = new DataTransfer(); list.forEach((f) => dt.items.add(f));
+    const input = findFileInput();
+    if (input) { input.files = dt.files; input.dispatchEvent(new Event("change", { bubbles: true })); return; }
+    ed.dispatchEvent(new ClipboardEvent("paste", { clipboardData: dt, bubbles: true, cancelable: true }));
+  }
+
+  let sending = false;
+  async function submit() {
+    const text = ta.value.trim();
+    if (sending || (!text && !files.length)) return;
+    sending = true;
+    const list = files.slice(), folder = targetSel.value, auto = S.autoSend;
+    try {
+      toggle(false);
+      // start from a fresh chat without reloading the page (a reload would drop the files)
+      if (!isHome()) {
+        const link = [...document.querySelectorAll(site.newLink)].find(visible) || document.querySelector(site.newLink);
+        if (link) link.click();
+        if (!(await waitFor(isHome, 5000))) { toggle(true); toast(`Couldn't open a new ${site.label} chat — your message is still here`); return; }
+        await sleep(400);
+      }
+      const ed = await waitFor(findEditor, 8000);
+      if (!ed) { toggle(true); toast(`Couldn't find ${site.label}'s chat box — your message is still here`); return; }
+      if (list.length) putFiles(ed, list);
+      if (text) putText(ed, text);
+      ta.value = ""; grow(); files = []; renderAttachments();
+      if (!auto) { ed.focus(); toast("Ready — press send when you are"); return; }
+      // wait until uploads finish and the send button wakes up
+      const btn = await waitFor(() => { const b = findSend(); return b && !b.disabled && b.getAttribute("aria-disabled") !== "true" ? b : null; }, list.length ? 90000 : 6000);
+      if (!btn) { ed.focus(); toast("Filled in — press send to finish"); return; }
+      btn.click();
+      toast(folder ? `Sent · filing in ${S.folders.find((f) => f.id === folder)?.name}` : "Sent");
+      // once the new chat gets its address, remember it (and its folder, if you picked one)
+      const here = await waitFor(() => parseLink(location.href), 30000);
+      if (here) {
+        const key = SITE + ":" + here.id;
+        S.chats[key] ||= { site: SITE, kind: here.kind, id: here.id, title: cleanTitle(text).slice(0, 80) || "New chat", path: here.path, seen: Date.now() };
+        if (folder) S.chats[key].folder = folder;
+        invalidate(); save();
+      }
+    } finally { sending = false; }
+  }
+
   /* ---------------- settings ---------------- */
   const sw = (on, attr) => `<button class="switch" role="switch" aria-checked="${!!on}" ${attr}></button>`;
   const cssEsc = (s) => (window.CSS?.escape ? CSS.escape(s) : s);
@@ -420,6 +607,12 @@
           <div class="row">loose, tilted sheets ${sw(S.tilt, "data-tilt")}</div>
           <div class="row">vellum envelopes for private folders ${sw(S.envelopes, "data-envs")}</div>
           <div class="row">open the board on the home page ${sw(S.openOnHome, "data-home")}</div>
+          <div class="row">stack similar folders <span class="seg3">${["auto", "on", "off"].map((m) => `<button data-stackmode="${m}" class="${S.stack === m ? "on" : ""}">${m}</button>`).join("")}</span></div>
+          <p class="small">auto: when sheets get too small to read, folders that mean similar things become one pile.</p>
+        </div>
+        <div class="sec"><h4>chat</h4>
+          <div class="row">send right away ${sw(S.autoSend, "data-autosend")}</div>
+          <p class="small">Off: Skin fills in ${esc(site.label)}'s chat box and you press send yourself — handy to pick a model or tools first.</p>
         </div>
         <div class="sec"><h4>folders</h4>
           ${S.folders.map((f) => `<details class="fold" data-f="${esc(f.id)}" ${openIds.has(f.id) ? "open" : ""}>
@@ -432,6 +625,7 @@
               <div class="swatches">${P.colors.map((c, i) => `<button style="background:${c}" class="${!f.custom && f.ci % P.colors.length === i ? "on" : ""}" data-ci="${i}" aria-label="Color ${i + 1}"></button>`).join("")}
                 <label title="custom color" style="${f.custom ? `background:${f.custom};border-style:solid` : ""}">${f.custom ? "" : "+"}<input type="color" value="${f.custom || colorOf(f)}" data-k="custom"></label></div>
               <div class="imgrow"><label>${f.image ? "replace image" : "add image"}<input type="file" accept="image/*" data-k="image"></label>${f.image ? `<button data-k="noimg">remove</button>` : ""}</div>
+              <div class="row">stack with <select data-k="group">${Object.entries(GROUPS).map(([g, v]) => `<option value="${g}" ${(f.group || "other") === g ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
               <label class="small">auto-sort words — comma separated, matched at the start of a word</label>
               <textarea rows="3" data-k="keywords">${esc(f.keywords)}</textarea>
               <button class="link danger" data-del>delete folder</button>
@@ -459,6 +653,8 @@
     d.querySelector("[data-envs]").onclick = () => { S.envelopes = !S.envelopes; commit(); };
     d.querySelector("[data-home]").onclick = () => { S.openOnHome = !S.openOnHome; save(); renderDrawer(); };
     d.querySelector("[data-add]").onclick = () => addFolder();
+    d.querySelectorAll("[data-stackmode]").forEach((b) => (b.onclick = () => { S.stack = b.dataset.stackmode; commit(); }));
+    d.querySelector("[data-autosend]").onclick = () => { S.autoSend = !S.autoSend; save(); renderDrawer(); };
     d.querySelector("[data-forget]").onclick = () => { if (confirm("Forget all remembered chats? Folders and colors stay.")) { S.chats = {}; lastSig = ""; commit(); } };
     d.querySelectorAll(".fold").forEach((el) => {
       const f = S.folders.find((x) => x.id === el.dataset.f);
@@ -468,6 +664,7 @@
       k("hideTitles").onclick = () => { f.hideTitles = !f.hideTitles; commit(); };
       k("envelope").onclick = () => { f.envelope = !f.envelope; commit(); };
       k("keywords").onchange = (e) => { f.keywords = e.target.value; commit(); };
+      k("group").onchange = (e) => { f.group = e.target.value; commit(); };
       k("custom").onchange = (e) => { f.custom = e.target.value; commit(); };
       el.querySelectorAll("[data-ci]").forEach((b) => (b.onclick = () => { f.ci = +b.dataset.ci; delete f.custom; commit(); }));
       k("image").onchange = async (e) => {
@@ -494,7 +691,8 @@
     if (e.altKey && e.shiftKey && e.code === "KeyS") { e.preventDefault(); toggle(); }
     else if (e.key === "Escape" && isOpen()) {
       if (drawer.classList.contains("open")) setDrawer(false);
-      else if (view.name === "folder") go({ name: "board" });
+      else if (view.name === "folder" && view.gid) go({ name: "stack", gid: view.gid });
+      else if (view.name !== "board") go({ name: "board" });
       else toggle(false);
     }
   }, true);
@@ -504,6 +702,7 @@
   let lastUrl = location.href;
   function onUrl() { scan(); if (S.openOnHome && isHome() && !isOpen()) toggle(true); }
   new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
+  let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (isOpen() && view.name !== "folder") renderView(); }, 150); });
   setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; onUrl(); } }, 700);
   chrome.storage.onChanged.addListener((ch, area) => {
     const nv = ch.skin?.newValue;
@@ -512,16 +711,30 @@
     if (isOpen()) { applyVars(); renderView(); if (drawer.classList.contains("open")) renderDrawer(); }
   });
   // v0.1 → v0.2: new word lists, envelopes and folders; keeps chats, moves and colors
+  // v0.3: folders get a meaning group for stacking
   function migrate(s) {
-    if ((s.v || 1) >= 2) return s;
-    const byId = Object.fromEntries(s.folders.map((f) => [f.id, f]));
-    for (const d of DEFAULT_FOLDERS) {
-      const f = byId[d.id];
-      if (f) { f.keywords = d.keywords; f.envelope ??= d.envelope; }
-      else s.folders.push(structuredClone(d));
+    if ((s.v || 1) < 2) {
+      const byId = Object.fromEntries(s.folders.map((f) => [f.id, f]));
+      for (const d of DEFAULT_FOLDERS) {
+        const f = byId[d.id];
+        if (f) { f.keywords = d.keywords; f.envelope ??= d.envelope; }
+        else s.folders.push(structuredClone(d));
+      }
     }
-    s.v = 2;
+    if ((s.v || 1) < 3) for (const f of s.folders) f.group ||= guessGroup(f);
+    s.v = 3;
     return s;
+  }
+  /* a new folder joins the group of the built-in folder whose words it shares most */
+  function guessGroup(f) {
+    if (GROUP_OF[f.id]) return GROUP_OF[f.id];
+    const mine = new Set(tokens(`${f.name} ${(f.keywords || "").replace(/,/g, " ")}`));
+    let best = "other", bestN = 0;
+    for (const d of DEFAULT_FOLDERS) {
+      const n = tokens(`${d.name} ${d.keywords.replace(/,/g, " ")}`).filter((t) => mine.has(t)).length;
+      if (n > bestN) { bestN = n; best = d.group; }
+    }
+    return best;
   }
   store.get("skin").then((r) => {
     if (r.skin) { S = migrate({ ...structuredClone(DEFAULT_STATE), ...r.skin, v: r.skin.v || 1 }); save(); }
@@ -568,7 +781,7 @@ button{cursor:pointer;background:none;border:0}
 .x{font-size:22px;line-height:1;color:var(--muted);padding:4px}.x:hover{color:#fff}
 
 /* board */
-.board{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:44px 36px;padding:26px 48px 40px;max-width:1320px;margin:0 auto}
+.board{display:grid;padding:20px 48px 24px;max-width:1320px;margin:0 auto}
 .wrap{--r:0deg;position:relative;transform:rotate(calc(var(--r)*var(--tilt)));transition:transform .45s cubic-bezier(.2,.8,.2,1)}
 .enter .wrap{animation:drop .7s cubic-bezier(.2,.8,.2,1) both;animation-delay:calc(var(--i)*55ms)}
 .wrap:hover{transform:rotate(0) translateY(-8px) scale(1.02)}
@@ -669,8 +882,43 @@ input[type=range]{accent-color:#e9e5dc;width:150px}
 .small{font-size:11px;color:var(--muted);line-height:1.45}
 .link{font-size:11px;text-decoration:underline;text-align:left;color:var(--muted)}.danger:hover{color:#E2623D}
 
+/* adaptive board: sheet size comes from --tile */
+.board{grid-template-columns:repeat(auto-fill,var(--tile,190px));justify-content:center;gap:var(--gy,44px) var(--gx,36px)}
+.board .name{font-size:clamp(13px,calc(var(--tile,190px)*.145),30px);left:calc(var(--tile,190px)*.07);top:calc(var(--tile,190px)*.06)}
+.board.tiny .foot,.board.tiny .lock{display:none}
+.board.tiny .sheet{--fold:18px}
+/* stacks */
+.stack .pile{position:absolute;inset:0;box-shadow:0 10px 18px rgba(0,0,0,.45)}
+.stack .p2{background:var(--c2);transform:rotate(5deg) translate(7px,3px)}
+.stack .p3{background:var(--c3);transform:rotate(-4deg) translate(-6px,6px)}
+.stack:hover .p2{transform:rotate(8deg) translate(12px,2px)}
+.stack:hover .p3{transform:rotate(-7deg) translate(-11px,8px)}
+.stack .pile{transition:transform .45s cubic-bezier(.2,.8,.2,1)}
+.dots{display:flex;gap:3px;align-items:flex-end}.dots i{width:7px;height:9px;box-shadow:0 0 0 1px rgba(0,0,0,.15)}
+/* chat box */
+.composer{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:30;width:min(720px,calc(100% - 32px))}
+.composer .cform{display:flex;gap:8px;align-items:flex-end;background:var(--paper);color:var(--ink);padding:8px 8px 8px 8px;box-shadow:0 20px 40px rgba(0,0,0,.55);position:relative}
+.composer .cform::after{content:"";position:absolute;inset:0;background-image:var(--noise),var(--fiber);opacity:calc(var(--grain)*1.6);mix-blend-mode:soft-light;pointer-events:none}
+.composer.drop .cform{outline:2px dashed var(--ink);outline-offset:-6px}
+.composer textarea{flex:1;border:0;background:none;outline:none;resize:none;font:14px/1.5 var(--mono);color:var(--ink);padding:7px 4px;max-height:180px;min-width:0;position:relative;z-index:1}
+.composer textarea::placeholder{color:#8a867d}
+.clip{width:34px;height:34px;display:grid;place-items:center;font:18px var(--mono);color:#6e6a62;cursor:pointer;flex:none;position:relative;z-index:1}
+.clip:hover{color:var(--ink)}
+.target{font:11px var(--mono);background:transparent;border:0;color:#6e6a62;max-width:120px;height:34px;position:relative;z-index:1;cursor:pointer}
+.send{font:12px var(--mono);padding:9px 16px;background:var(--ink);color:var(--paper);flex:none;position:relative;z-index:1}
+.chint{margin-top:8px;text-align:center;font-size:10.5px;color:var(--muted)}
+.attachments{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px}
+.att{display:flex;align-items:center;gap:8px;background:var(--paper);color:var(--ink);padding:4px 6px 4px 4px;box-shadow:0 8px 18px rgba(0,0,0,.4);max-width:220px}
+.att canvas,.att .fname{width:40px;height:40px;flex:none;display:grid;place-items:center;background:#d9d5cc;font:10px var(--mono);text-transform:uppercase}
+.alabel{font-size:11px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.att button{font-size:16px;color:#6e6a62;padding:0 4px}
+.toast{position:fixed;left:50%;bottom:120px;transform:translate(-50%,10px);z-index:2147483001;font:12px "Skin Mono",ui-monospace,monospace;background:#ECE9E2;color:#131311;padding:9px 14px;box-shadow:0 10px 24px rgba(0,0,0,.35);opacity:0;transition:opacity .3s,transform .3s;pointer-events:none}
+.toast.show{opacity:1;transform:translate(-50%,0)}
+.seg3{display:flex;border:1px solid var(--line)}.seg3 button{font:11px var(--mono);padding:5px 10px;color:var(--muted)}.seg3 button.on{background:#e9e5dc;color:#111}
+.drawer select{background:#0f0f0e;border:1px solid var(--line);padding:5px 8px;font-size:12px}
+
 @media (max-width:760px){.bar{grid-template-columns:1fr auto;padding:16px}.seg{grid-column:1/-1;order:3;justify-self:start}.hide-sm{display:none}
-  .board{padding:16px 16px 40px;gap:28px 18px;grid-template-columns:repeat(auto-fill,minmax(140px,1fr))}.room{padding:8px 16px 40px}}
+  .board{padding:12px 16px 24px}.room{padding:8px 16px 40px}}
 @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
 `;
   }

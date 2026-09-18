@@ -8,7 +8,14 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
 
 ## What it does
 
-- **Board of folders.** Opens on the home page, or with the `skin` tab on the right edge (`Alt+Shift+S`).
+- **Board of folders, chat box below.** Opens on the home page, or with the `skin` tab on the right edge (`Alt+Shift+S`).
+  Type in the paper chat box at the bottom and add photos or files (＋, paste, or drag in). Skin opens a new chat on the
+  site, drops your message and files into the site's own chat box, and presses send. Models, tools, projects and
+  history work as usual. You can pick a folder for the new chat, or leave it on `auto`. Turn off *send right away*
+  if you want to pick a model before sending.
+- **Sheets that fit.** The more folders you have, the smaller the sheets get, so the whole board fits above the chat box.
+  When the sheets get too small to read, folders that mean similar things stack into piles (paperwork,
+  work & making, mind, living). Stacking can be set to `auto`, `on` or `off`.
 - **Auto-sort, in three steps:**
   1. **Words.** Each folder has a list of word stems (English, Ukrainian, Russian), which you can edit in settings.
   2. **Your moves.** A chat you move by hand teaches Skin. Chats with similar words follow it into the
@@ -50,7 +57,8 @@ python3 -m http.server 5179
 
 ## Limits
 
-- Site updates can break link detection (`/chat/<id>` on Claude, `/c/<id>` on ChatGPT).
+- Site updates can break link detection (`/chat/<id>` on Claude, `/c/<id>` on ChatGPT), and the chat-box hand-off
+  (it looks for the site's editor, file input and send button).
 - Auto-sort uses words and your moves, not a language model.
 - Anthropic's and OpenAI's consumer terms restrict automated access. Skin only reads what's already
   on the page and never fetches data in the background.

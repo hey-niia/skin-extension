@@ -5,15 +5,29 @@
 <title>Mock Claude</title>
 <style>
   body{margin:0;font:14px -apple-system,Helvetica,sans-serif;background:#f5f4ef;color:#222;display:flex;height:100vh}
-  nav{width:260px;border-right:1px solid #ddd;padding:12px;overflow:auto}
+  nav{width:260px;border-right:1px solid #ddd;padding:12px;overflow:auto;flex:none}
   nav a{display:block;padding:6px 8px;color:#333;text-decoration:none;border-radius:6px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   nav a:hover{background:#eae8e0}
-  main{flex:1;display:grid;place-items:center;color:#888}
+  .page{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;padding:24px}
+  #thread{color:#666;max-width:600px;white-space:pre-wrap}
+  .box{width:min(640px,100%);background:#fff;border:1px solid #ddd;border-radius:16px;padding:12px;display:flex;gap:8px;align-items:flex-end}
+  .ProseMirror{flex:1;min-height:24px;outline:none;white-space:pre-wrap}
+  #files{font-size:12px;color:#777}
+  button[aria-label]{width:32px;height:32px;border-radius:8px;border:0;background:#c96442;color:#fff}
+  button[aria-label]:disabled{opacity:.4}
 </style>
 </head>
 <body>
-<nav id="side"><b>Recents</b></nav>
-<main>Mock of a chat site's sidebar — for testing the Skin content script.</main>
+<nav id="side"><a href="/new" id="newchat"><b>+ New chat</b></a><b>Recents</b></nav>
+<div class="page">
+  <div id="thread">Mock of a chat site — for testing the Skin content script.</div>
+  <div id="files"></div>
+  <div class="box">
+    <input type="file" multiple id="mf" hidden>
+    <div class="ProseMirror" contenteditable="true"></div>
+    <button aria-label="Send message" disabled>↑</button>
+  </div>
+</div>
 <script>
   // Neutral sample titles, English + Ukrainian, like a real sidebar
   const titles = [
@@ -30,14 +44,29 @@
     "Wedding speech draft", "Plant care for monstera", "Monstera leaves turning yellow",
     "Paper texture shader", "Component naming conventions", "Weekend in Lviv"
   ];
-  const side = document.getElementById("side");
-  titles.forEach((t, i) => {
+  const side = document.getElementById("side"), thread = document.getElementById("thread");
+  const link = (t, id, top) => {
     const a = document.createElement("a");
-    const id = (i + 1).toString(16).padStart(8, "0") + "-0000-4000-8000-000000000000";
     a.href = "/chat/" + id; a.textContent = t;
-    a.onclick = (e) => { e.preventDefault(); history.pushState({}, "", a.href); document.querySelector("main").textContent = t; };
-    side.appendChild(a);
-  });
+    a.onclick = (e) => { e.preventDefault(); history.pushState({}, "", a.href); thread.textContent = t; };
+    top ? side.insertBefore(a, side.children[2]) : side.appendChild(a);
+  };
+  titles.forEach((t, i) => link(t, (i + 1).toString(16).padStart(8, "0") + "-0000-4000-8000-000000000000"));
+  document.getElementById("newchat").onclick = (e) => { e.preventDefault(); history.pushState({}, "", "/new"); thread.textContent = "New chat"; };
+
+  // composer that behaves roughly like the real one
+  const ed = document.querySelector(".ProseMirror"), send = document.querySelector("[aria-label='Send message']"), mf = document.getElementById("mf");
+  let files = [];
+  const sync = () => { send.disabled = !ed.textContent.trim() && !files.length; document.getElementById("files").textContent = files.length ? files.map((f) => "📎 " + f.name).join("  ") : ""; };
+  ed.addEventListener("input", sync);
+  mf.addEventListener("change", () => { files = [...files, ...mf.files]; sync(); });
+  send.onclick = () => {
+    const text = ed.textContent.trim(), id = Date.now().toString(16).padStart(8, "0").slice(-8) + "-0000-4000-8000-000000000001";
+    link(text.slice(0, 40) || "Untitled", id, true);
+    history.pushState({}, "", "/chat/" + id);
+    thread.textContent = "You: " + text + (files.length ? "\n(" + files.length + " file(s): " + files.map((f) => f.name).join(", ") + ")" : "");
+    ed.textContent = ""; files = []; sync();
+  };
 </script>
 <script src="chrome-shim.js"></script>
 <script src="../src/content.js"></script>
