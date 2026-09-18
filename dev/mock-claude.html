@@ -50,10 +50,14 @@
   const convos = {};
   // like the real page: a screen-reader heading, a thinking summary (shown twice),
   // a tool step, then the answer inside .standard-markdown
+  const svg = (w, h, c, label) => "data:image/svg+xml," + encodeURIComponent(`<svg xmlns='http://www.w3.org/2000/svg' width='${w}' height='${h}'><rect width='100%' height='100%' fill='${c}'/><text x='50%' y='55%' font-family='sans-serif' font-size='${Math.round(h / 7)}' text-anchor='middle' fill='white'>${label}</text></svg>`);
+  const fav = svg(16, 16, "#999", "");
+  const gallery = () => ["#6D7B5B", "#B88B58", "#3D8FE0"].map((c, i) => `<a href="#"><img src="${svg(320, 240, c, "photo " + (i + 1))}" width="160" height="120" alt="photo ${i + 1}"><img src="${fav}" width="16" height="16" alt=""><span>site${i + 1}</span></a>`).join("") + "<span>Results from the web</span>";
   const answer = (t) => `<h2 class="sr-only" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)">Claude responded: Here's a short take on ${t}.</h2>
     <div class="thinking"><button><span>Weighing a few directions for ${t}</span></button><div class="summary">Weighing a few directions for ${t}</div><div style="display:none">long hidden reasoning…</div></div>
     <div class="tool">Searched the web · 4 results</div>
-    <div class="standard-markdown"><p>Here's a short take on <strong>${t}</strong>.</p><ul><li>First, the main idea.</li><li>Then a detail with <code>inline code</code>.</li></ul><pre><code>const paper = "grain";</code></pre><p>More: <a href="https://example.com">a link</a>. <button>Copy</button> <span onclick="window.__evil=1" style="color:red">styled span</span></p><img alt="chart"></div>`;
+    <div class="gallery">${gallery()}</div>
+    <div class="standard-markdown"><p>Here's a short take on <strong>${t}</strong>.</p><ul><li>First, the main idea.</li><li>Then a detail with <code>inline code</code>.</li></ul><pre><code>const paper = "grain";</code></pre><p>More: <a href="https://example.com">a link</a>. <button>Copy</button> <span onclick="window.__evil=1" style="color:red">styled span</span></p><img src="${svg(640, 360, "#E2623D", "chart")}" alt="chart" style="max-width:100%"></div>`;
   const show = (id) => {
     thread.innerHTML = "";
     for (const m of convos[id] || []) {

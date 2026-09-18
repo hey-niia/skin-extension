@@ -453,7 +453,7 @@
     for (const n of src.childNodes) {
       if (n.nodeType === 3) { out.appendChild(document.createTextNode(n.nodeValue)); continue; }
       if (n.nodeType !== 1 || SKIP.test(n.tagName) || hiddenish(n)) continue;
-      if (n.tagName === "IMG") { out.appendChild(Object.assign(document.createElement("span"), { className: "imgnote", textContent: "[image]" })); continue; }
+      if (n.tagName === "IMG") { if (isPicture(n)) out.appendChild(picture(n)); continue; }
       if (!SAFE.has(n.tagName)) {
         const inner = clean(n);
         // keep block structure of plain divs as line breaks
@@ -468,6 +468,52 @@
     }
     return out;
   }
+  /* Pictures: Skin paints the page's own, already-loaded <img> onto a canvas.
+   * No new request, and the site's security rules don't get in the way. */
+  const isPicture = (img) => {
+    if (/favicon|\/icons?\//i.test(img.currentSrc || img.src || "")) return false;
+    const r = img.getBoundingClientRect();
+    const w = img.naturalWidth || r.width || +img.getAttribute("width") || 0, h = img.naturalHeight || r.height || +img.getAttribute("height") || 0;
+    return !(w && h) || (w >= 64 && h >= 48);
+  };
+  function picture(img, cls = "pimg") {
+    const cv = document.createElement("canvas");
+    cv.className = cls; cv.title = img.alt || "picture";
+    const draw = () => {
+      const w = img.naturalWidth, h = img.naturalHeight; if (!w || !h) return;
+      const max = cls === "thumb" ? 220 : 640, s = Math.min(1, max / w), dpr = Math.min(2, devicePixelRatio || 1);
+      cv.width = w * s * dpr; cv.height = h * s * dpr;
+      cv.style.width = w * s + "px"; cv.style.aspectRatio = `${w} / ${h}`;
+      try { cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); } catch {}
+    };
+    if (img.complete && img.naturalWidth) draw();
+    else { if (img.loading === "lazy") img.loading = "eager"; img.addEventListener("load", draw, { once: true }); }
+    cv.addEventListener("click", () => openPicture(img));
+    return cv;
+  }
+  function gallery(imgs) {
+    const row = document.createElement("div"); row.className = "gallery";
+    imgs.forEach((img) => row.appendChild(picture(img, "thumb")));
+    return row;
+  }
+  function openPicture(img) {
+    const box = document.createElement("div"); box.className = "lightbox"; box.tabIndex = -1;
+    const cv = document.createElement("canvas");
+    const w = img.naturalWidth, h = img.naturalHeight;
+    const s = Math.min(1, (innerWidth * 0.9) / w, (innerHeight * 0.82) / h), dpr = Math.min(2, devicePixelRatio || 1);
+    cv.width = w * s * dpr; cv.height = h * s * dpr; cv.style.width = w * s + "px";
+    try { cv.getContext("2d").drawImage(img, 0, 0, cv.width, cv.height); } catch {}
+    box.appendChild(cv);
+    const src = img.currentSrc || img.src || "";
+    const bar = document.createElement("div"); bar.className = "lbbar";
+    bar.innerHTML = `<span>${esc(img.alt || "")}</span>${/^https?:\/\//i.test(src) ? `<a href="${esc(src)}" target="_blank" rel="noopener noreferrer">open original ↗</a>` : ""}<button aria-label="Close">×</button>`;
+    box.appendChild(bar);
+    const close = () => box.remove();
+    box.onclick = (e) => { if (e.target === box || e.target.tagName === "BUTTON") close(); };
+    box.onkeydown = (e) => { if (e.key === "Escape") { e.stopPropagation(); close(); } };
+    overlay.appendChild(box); box.focus();
+  }
+
   const ANSWER = ".standard-markdown, .progressive-markdown";
   function cleanAssistant(el) {
     if (!el.querySelector(ANSWER)) return clean(el);
@@ -481,10 +527,13 @@
     const walk = (node) => {
       for (const n of node.childNodes) {
         if (n.nodeType === 3) { aside(n.nodeValue); continue; }
-        if (n.nodeType !== 1 || hiddenish(n) || /^(svg|style|script|noscript|img|canvas|video|audio|iframe)$/i.test(n.tagName)) continue;
+        if (n.nodeType !== 1 || hiddenish(n) || /^(svg|style|script|noscript|canvas|video|audio|iframe)$/i.test(n.tagName)) continue;
+        if (n.tagName === "IMG") { if (isPicture(n)) out.appendChild(gallery([n])); continue; }
         if (n.matches(ANSWER)) { const d = document.createElement("div"); d.className = "answer"; d.appendChild(clean(n)); out.appendChild(d); continue; }
-        if (n.querySelector(ANSWER)) walk(n);
-        else aside(n.innerText); // innerText skips collapsed (display:none) reasoning
+        if (n.querySelector(ANSWER)) { walk(n); continue; }
+        const pics = [...n.querySelectorAll("img")].filter(isPicture);
+        if (pics.length) out.appendChild(gallery(pics));
+        aside(n.innerText); // innerText skips collapsed (display:none) reasoning
       }
     };
     walk(el);
@@ -507,7 +556,7 @@
     if (!msgs.length) return;
     box.querySelector(".waiting")?.remove();
     msgs.forEach((m, i) => {
-      const len = m.el.textContent.length;
+      const len = m.el.textContent.length + ":" + m.el.getElementsByTagName("img").length;
       let hit = cache.get(m.el);
       if (!hit || hit.len !== len) {
         const node = document.createElement("div");
@@ -873,7 +922,9 @@
   addEventListener("keydown", (e) => {
     if (e.altKey && e.shiftKey && e.code === "KeyS") { e.preventDefault(); toggle(); }
     else if (e.key === "Escape" && isOpen()) {
-      if (drawer.classList.contains("open")) setDrawer(false);
+      const lb = overlay.querySelector(".lightbox");
+      if (lb) lb.remove();
+      else if (drawer.classList.contains("open")) setDrawer(false);
       else if (view.name === "read") go(view.fid ? { name: "folder", fid: view.fid, gid: view.gid } : { name: "board" });
       else if (view.name === "folder" && view.gid) go({ name: "stack", gid: view.gid });
       else if (view.name !== "board") go({ name: "board" });
@@ -1152,6 +1203,14 @@ input[type=range]{accent-color:#e9e5dc;width:150px}
 .m .body a{color:inherit;text-underline-offset:3px}
 .m .body hr{border:0;border-top:1px solid color-mix(in srgb,var(--fg) 30%,transparent);margin:1em 0}
 .imgnote{font:11px var(--mono);opacity:.6}
+.pimg{display:block;max-width:100%;height:auto;margin:.4em 0 .9em;cursor:zoom-in;box-shadow:0 6px 16px rgba(0,0,0,.25)}
+.gallery{display:flex;gap:10px;overflow-x:auto;margin:4px 0 8px;padding-bottom:4px}
+.thumb{flex:none;height:120px;width:auto!important;max-width:220px;object-fit:cover;cursor:zoom-in;box-shadow:0 6px 14px rgba(0,0,0,.25);transition:transform .2s}
+.thumb:hover{transform:translateY(-2px) rotate(-.6deg)}
+.lightbox{position:fixed;inset:0;z-index:70;background:rgba(8,8,7,.86);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;outline:none;animation:fade .2s both}
+.lightbox canvas{max-width:90vw;max-height:82vh;box-shadow:0 30px 60px rgba(0,0,0,.6)}
+.lbbar{display:flex;gap:18px;align-items:center;font:12px var(--mono);color:#e9e5dc}
+.lbbar a{color:#e9e5dc}.lbbar button{font-size:22px;color:var(--muted)}
 .m .body .aside{font:10px/1.45 var(--mono);opacity:.55;margin:0 0 6px;letter-spacing:.01em}
 .m .body .aside::before{content:"· "}
 .m .body .aside + .answer{margin-top:10px}

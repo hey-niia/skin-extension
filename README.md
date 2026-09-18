@@ -16,7 +16,9 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
 - **Read and reply on paper.** Open a chat from a folder and it's printed on a sheet in that folder's color: your
   messages, the model's answers (with lists, code and tables), and replies streaming in live. Reply from the chat box at
   the bottom. Skin copies the text from the site's page into its own simple markup, and never uses the site's HTML.
-  `open in Claude ↗` shows the usual view (for artifacts, images and so on).
+  Pictures in answers and rows of web results show up too. Skin paints the page's own, already-loaded images onto the
+  paper, so nothing is downloaded again. Click a picture to see it large. Thinking and tool steps are shown as tiny notes.
+  `open in Claude ↗` shows the usual view (for artifacts and so on).
 - **Folders and chats.** Rename a folder by clicking its title. Move a chat to any folder, or to a new one
   (`+ new folder…`). `×` removes a chat from Skin, with undo. It stays in Claude, and you delete it for good there.
 - **Sheets that fit.** The more folders you have, the smaller the sheets get, so the whole board fits above the chat box.
