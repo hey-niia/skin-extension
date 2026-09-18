@@ -214,7 +214,10 @@
   document.documentElement.appendChild(host);
   const asset = (p) => chrome.runtime.getURL(p);
   root.innerHTML = `<style>${CSS()}</style>
-    <button class="tab" title="Skin (Alt+Shift+S)"><span>skin</span></button>
+    <div class="tab" role="toolbar" aria-label="Skin">
+      <button class="tskin" data-t="skin" title="Open Skin (Alt+Shift+S)">skin</button>
+      <span class="tseg"><button data-t="chat">chat</button><button data-t="code">${esc(site.codeLabel)}</button></span>
+    </div>
     <div class="overlay" hidden>
       <div class="grainlayer"></div>
       <header class="bar"></header>
@@ -236,7 +239,10 @@
   const $ = (s) => root.querySelector(s);
   const overlay = $(".overlay"), bar = $(".bar"), viewEl = $(".view"), drawer = $(".drawer"), scrim = $(".scrim");
   const composer = $(".composer"), ta = $(".composer textarea"), fileIn = $(".composer input[type=file]"), targetSel = $(".composer .target");
-  $(".tab").onclick = () => toggle(true);
+  $(".tab [data-t=skin]").onclick = () => toggle(true);
+  $(".tab [data-t=chat]").onclick = () => goChat();
+  $(".tab [data-t=code]").onclick = () => goCode();
+  queueMicrotask(() => updateTab());
   scrim.onclick = () => setDrawer(false);
   // Sites like claude.ai grab focus for their own editor when you type "anywhere"
   // (they see our host div, not our textarea). Keep our typing and pasting to ourselves.
@@ -251,7 +257,36 @@
     host.style.pointerEvents = open ? "auto" : "none";
     $(".tab").style.display = open ? "none" : "";
     document.documentElement.style.overflow = open ? "hidden" : "";
-    if (open) { scan(); applyVars(); renderView(true); setTimeout(() => ta.focus({ preventScroll: true }), 50); } else setDrawer(false);
+    if (open) {
+      scan(); applyVars();
+      const here = parseLink(location.href), key = here && SITE + ":" + here.id;
+      if (here?.kind === "chat" && S.chats[key] && !S.chats[key].hidden) {
+        if (view.name !== "read" || view.key !== key) view = { name: "read", key, fid: whereIs(key) || undefined };
+        renderView(true);
+        waitFor(() => extractMessages().length, 8000).then(() => view.name === "read" && view.key === key && isOpen() && startReader());
+      } else {
+        if (view.name === "read") view = view.fid ? { name: "folder", fid: view.fid, gid: view.gid } : { name: "board" };
+        renderView(true);
+      }
+      setTimeout(() => ta.focus({ preventScroll: true }), 50);
+    } else { setDrawer(false); stopReader(); }
+    updateTab();
+  }
+  /* chat ⇄ code: the code side is the site's own page; Skin waits in the tab on top */
+  const codePath = () => new URL(site.codeUrl).pathname;
+  const onCode = () => codePath() !== "/" && location.pathname.startsWith(codePath());
+  function updateTab() {
+    const code = onCode();
+    $(".tab [data-t=chat]").classList.toggle("on", !code);
+    $(".tab [data-t=code]").classList.toggle("on", code);
+  }
+  function goCode() { if (!onCode()) navigate(site.codeUrl); else toggle(false); }
+  async function goChat() {
+    if (!onCode()) { toggle(true); return; }
+    const link = [...document.querySelectorAll(site.newLink)].find(visible);
+    if (link) { link.click(); if (await waitFor(() => !onCode(), 4000)) { toggle(true); return; } }
+    sessionStorage.setItem("skin-open", "1"); // a full page load: reopen Skin once it's back
+    location.assign(site.chatUrl);
   }
   function setDrawer(open) {
     drawer.classList.toggle("open", open); scrim.classList.toggle("open", open);
@@ -292,7 +327,7 @@
     bar.querySelector("[data-folderback]")?.addEventListener("click", () => go({ name: "folder", fid: view.fid, gid: view.gid }));
     bar.querySelector("[data-close]").onclick = () => toggle(false);
     bar.querySelector("[data-settings]").onclick = () => setDrawer(!drawer.classList.contains("open"));
-    bar.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => navigate(b.dataset.go === "code" ? site.codeUrl : site.chatUrl)));
+    bar.querySelectorAll("[data-go]").forEach((b) => (b.onclick = () => (b.dataset.go === "code" ? goCode() : goChat())));
   }
 
   /* ---------------- board ---------------- */
@@ -935,7 +970,7 @@
   /* ---------------- lifecycle ---------------- */
   const isHome = () => site.home.includes(location.pathname);
   let lastUrl = location.href;
-  function onUrl() { scan(); if (S.openOnHome && isHome() && !isOpen()) toggle(true); }
+  function onUrl() { scan(); updateTab(); if (S.openOnHome && isHome() && !isOpen()) toggle(true); }
   new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
   let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (isOpen() && view.name !== "folder") renderView(); }, 150); });
   setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; onUrl(); } }, 700);
@@ -975,6 +1010,7 @@
 
   store.get("skin").then((r) => {
     if (r.skin) { S = migrate({ ...structuredClone(DEFAULT_STATE), ...r.skin, v: r.skin.v || 1 }); save(); }
+    if (sessionStorage.getItem("skin-open")) { sessionStorage.removeItem("skin-open"); setTimeout(() => toggle(true), 600); return; }
     const pending = sessionStorage.getItem("skin-read");
     if (pending) {
       sessionStorage.removeItem("skin-read");
@@ -1006,9 +1042,18 @@ button{cursor:pointer;background:none;border:0}
 @keyframes drop{from{opacity:0;transform:translateY(24px) rotate(calc(var(--r)*var(--tilt)*3))}}
 @keyframes rise{from{opacity:0;transform:translateY(30px)}}
 
-.tab{pointer-events:auto;position:fixed;right:0;top:50%;transform:translateY(-50%);writing-mode:vertical-rl;padding:14px 7px;
-  background:#ECE9E2;color:#131311;font:500 11px/1 "Skin Mono",ui-monospace,Menlo,monospace;letter-spacing:.08em;box-shadow:-4px 6px 14px rgba(0,0,0,.28);transition:padding .2s}
-.tab:hover{padding-right:11px}
+.tab{pointer-events:auto;position:fixed;top:0;left:50%;transform:translate(-50%,-2px);display:flex;align-items:center;gap:6px;
+  padding:6px 5px 6px 12px;background:#ECE9E2;color:#131311;font:500 11px/1 "Skin Mono",ui-monospace,Menlo,monospace;letter-spacing:.04em;
+  box-shadow:0 6px 16px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.2);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
+.tab::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:url("${asset("assets/grain.png")}");opacity:.5;mix-blend-mode:soft-light}
+.tab:hover{transform:translate(-50%,0)}
+.tab button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;position:relative;z-index:1}
+.tskin{padding:3px 4px 3px 0;letter-spacing:.08em}
+.tskin:hover{text-decoration:underline;text-underline-offset:3px}
+.tseg{display:flex;border:1px solid rgba(19,19,17,.25);border-radius:999px;padding:2px;position:relative;z-index:1}
+.tseg button{padding:3px 9px;border-radius:999px;color:#6e6a62}
+.tseg button.on{background:#131311;color:#ECE9E2}
+.tseg button:not(.on):hover{color:#131311}
 
 /* top bar */
 .bar{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:1fr auto 1fr;align-items:flex-start;gap:16px;padding:22px 32px 18px;background:linear-gradient(var(--bg) 60%,transparent)}

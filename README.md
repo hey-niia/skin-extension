@@ -8,7 +8,7 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
 
 ## What it does
 
-- **Board of folders, chat box below.** Opens on the home page, or with the `skin` tab on the right edge (`Alt+Shift+S`).
+- **Board of folders, chat box below.** Opens on the home page, or with the `skin` tab at the top (`Alt+Shift+S`).
   Type in the paper chat box at the bottom and add photos or files (＋, paste, or drag in). Skin opens a new chat on the
   site, drops your message and files into the site's own chat box, and presses send. Models, tools, projects and
   history work as usual. You can pick a folder for the new chat, or leave it on `auto`. Turn off *send right away*
@@ -31,7 +31,9 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
   3. **New folder ideas.** Words that keep repeating among unsorted chats become suggested folders.
   Everything runs in the browser. No model and no network.
 - **Privacy looks.** You can hide a folder's name and keep only its color, blur its chat titles until you hover, or turn it into a vellum envelope.
-- **Chat / Code switch.** Jump between Claude and Claude Code (`claude.ai/code`), or ChatGPT and Codex.
+- **A tab that hangs from the top** of the page whenever Skin is closed: `skin · chat · claude code`. Switch to Claude Code
+  (or Codex on ChatGPT), do your work there, then press `chat` or `skin` to come back. If a chat is open on the page,
+  Skin opens it on paper. The same works after `open in Claude ↗`.
 - **One board, both sites.** Chats from Claude and ChatGPT are stored together, and each chat opens on its own site.
 - **Same look as the [prototype](https://github.com/hey-niia/skin/tree/main/prototype):** 4 palettes (neon, kraft, fold, vellum),
   paper grain and fibres, folded corners, and an image on any folder. Fonts are Spline Sans Mono + Instrument Sans
