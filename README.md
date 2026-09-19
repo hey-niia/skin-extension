@@ -1,8 +1,9 @@
-# Skin — browser extension
+# Skin
 
-A paper skin for **Claude** and **ChatGPT**. Your chats are sorted into folders that look like
-sheets of paper on a dark desk. You pick the colors, hide a folder's name, or blur its chat titles.
-Chatting works exactly as before, on the real site.
+A private, local-first skin for your LLM. Think Winamp skins, but for Claude and ChatGPT.
+
+Instead of the default chat UI, you see your own board. Every conversation is sorted into a folder, and every folder
+is a sheet of paper you style yourself: color, image, label, or no label at all.
 
 Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with an anonymized API chat.
 
