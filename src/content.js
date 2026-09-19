@@ -214,10 +214,7 @@
   document.documentElement.appendChild(host);
   const asset = (p) => chrome.runtime.getURL(p);
   root.innerHTML = `<style>${CSS()}</style>
-    <div class="tab" role="toolbar" aria-label="Skin">
-      <button class="tskin" data-t="skin" title="Open Skin (Alt+Shift+S)">skin</button>
-      <span class="tseg"><button data-t="chat">chat</button><button data-t="code">${esc(site.codeLabel)}</button></span>
-    </div>
+    <div class="tab"><button class="tskin" data-t="skin" title="Open Skin (Alt+Shift+S)">skin</button></div>
     <div class="overlay" hidden>
       <div class="grainlayer"></div>
       <header class="bar"></header>
@@ -239,10 +236,8 @@
   const $ = (s) => root.querySelector(s);
   const overlay = $(".overlay"), bar = $(".bar"), viewEl = $(".view"), drawer = $(".drawer"), scrim = $(".scrim");
   const composer = $(".composer"), ta = $(".composer textarea"), fileIn = $(".composer input[type=file]"), targetSel = $(".composer .target");
-  $(".tab [data-t=skin]").onclick = () => toggle(true);
-  $(".tab [data-t=chat]").onclick = () => goChat();
-  $(".tab [data-t=code]").onclick = () => goCode();
-  queueMicrotask(() => updateTab());
+  // from Claude Code, "skin" brings you back to the chat side and opens Skin there
+  $(".tab [data-t=skin]").onclick = () => (onCode() ? goChat() : toggle(true));
   scrim.onclick = () => setDrawer(false);
   // Sites like claude.ai grab focus for their own editor when you type "anywhere"
   // (they see our host div, not our textarea). Keep our typing and pasting to ourselves.
@@ -270,16 +265,10 @@
       }
       setTimeout(() => ta.focus({ preventScroll: true }), 50);
     } else { setDrawer(false); stopReader(); }
-    updateTab();
   }
   /* chat ⇄ code: the code side is the site's own page; Skin waits in the tab on top */
   const codePath = () => new URL(site.codeUrl).pathname;
   const onCode = () => codePath() !== "/" && location.pathname.startsWith(codePath());
-  function updateTab() {
-    const code = onCode();
-    $(".tab [data-t=chat]").classList.toggle("on", !code);
-    $(".tab [data-t=code]").classList.toggle("on", code);
-  }
   function goCode() { if (!onCode()) navigate(site.codeUrl); else toggle(false); }
   async function goChat() {
     if (!onCode()) { toggle(true); return; }
@@ -309,7 +298,7 @@
         ${view.name === "folder"
           ? `<div class="crumbs"><button data-back>← board</button>${view.gid ? `<span>/</span><button data-stackback>${esc(GROUPS[view.gid]?.name || "")}</button>` : ""}<span>/</span><span>${f ? (f.showName ? esc(f.name) : "●●●") : "unsorted"}</span></div>`
           : view.name === "read"
-          ? `<div class="crumbs"><button data-back>← board</button>${view.fid ? `<span>/</span><button data-folderback>${(() => { const x = S.folders.find((y) => y.id === view.fid); return x ? (x.showName ? esc(x.name) : "●●●") : "unsorted"; })()}</button>` : ""}<span>/</span><span>reading</span></div>`
+          ? `<div class="crumbs"><button data-back>← board</button>${view.fid ? `<span>/</span><button data-folderback>${(() => { const x = S.folders.find((y) => y.id === view.fid); return x ? (x.showName ? esc(x.name) : "●●●") : "unsorted"; })()}</button>` : ""}<span>/</span><span class="ctitle">${esc(S.chats[view.key]?.title || view.title || "new chat")}</span></div>`
           : view.name === "stack"
           ? `<div class="crumbs"><button data-back>← board</button><span>/</span><span>${esc(GROUPS[view.gid]?.name || "")}</span></div>`
           : `<div class="meta"><b>skin</b><br>your conversations,<br>on paper</div>`}</div>
@@ -1034,7 +1023,7 @@
   /* ---------------- lifecycle ---------------- */
   const isHome = () => site.home.includes(location.pathname);
   let lastUrl = location.href;
-  function onUrl() { scan(); updateTab(); if (S.openOnHome && isHome() && !isOpen()) toggle(true); }
+  function onUrl() { scan(); if (S.openOnHome && isHome() && !isOpen()) toggle(true); }
   new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
   let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (isOpen() && view.name !== "folder") renderView(); }, 150); });
   setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; onUrl(); } }, 700);
@@ -1112,17 +1101,13 @@ button{cursor:pointer;background:none;border:0}
 @keyframes rise{from{opacity:0;transform:translateY(30px)}}
 
 .tab{pointer-events:auto;position:fixed;top:0;left:50%;transform:translate(-50%,-2px);display:flex;align-items:center;gap:6px;
-  padding:6px 5px 6px 12px;background:#ECE9E2;color:#131311;font:500 11px/1 "Skin Mono",ui-monospace,Menlo,monospace;letter-spacing:.04em;
+  padding:7px 14px 7px;background:#ECE9E2;color:#131311;font:500 11px/1 "Skin Mono",ui-monospace,Menlo,monospace;letter-spacing:.04em;
   box-shadow:0 6px 16px rgba(0,0,0,.28),0 1px 2px rgba(0,0,0,.2);transition:transform .25s cubic-bezier(.2,.8,.2,1)}
 .tab::after{content:"";position:absolute;inset:0;pointer-events:none;background-image:url("${asset("assets/grain.png")}");opacity:.5;mix-blend-mode:soft-light}
 .tab:hover{transform:translate(-50%,0)}
 .tab button{font:inherit;color:inherit;background:none;border:0;cursor:pointer;position:relative;z-index:1}
-.tskin{padding:3px 4px 3px 0;letter-spacing:.08em}
+.tskin{padding:2px 0;letter-spacing:.08em}
 .tskin:hover{text-decoration:underline;text-underline-offset:3px}
-.tseg{display:flex;border:1px solid rgba(19,19,17,.25);border-radius:999px;padding:2px;position:relative;z-index:1}
-.tseg button{padding:3px 9px;border-radius:999px;color:#6e6a62}
-.tseg button.on{background:#131311;color:#ECE9E2}
-.tseg button:not(.on):hover{color:#131311}
 
 /* top bar */
 .bar{position:sticky;top:0;z-index:20;display:grid;grid-template-columns:1fr auto 1fr;align-items:flex-start;gap:16px;padding:22px 32px 18px;background:linear-gradient(var(--bg) 60%,transparent)}
@@ -1131,7 +1116,8 @@ button{cursor:pointer;background:none;border:0}
 .mark i{background:#e9e5dc;opacity:.85}.mark i:nth-child(2n){opacity:.25}
 .meta{font-size:10.5px;line-height:1.35;color:var(--muted);letter-spacing:.01em}.meta b{color:#e9e5dc;font-weight:500}
 .crumbs{font:12px var(--mono);color:var(--muted);display:flex;gap:8px;align-items:center}
-.crumbs button{color:var(--muted)}.crumbs button:hover{color:#fff}
+.crumbs button{color:var(--muted)}
+.ctitle{color:#e9e5dc;max-width:min(38vw,420px);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.crumbs button:hover{color:#fff}
 .seg{display:flex;border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:3px}
 .seg button{font:12px var(--mono);padding:6px 14px;border-radius:999px;color:var(--muted)}
 .seg button.on{background:#e9e5dc;color:#111}

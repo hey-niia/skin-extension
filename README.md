@@ -33,9 +33,9 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
   3. **New folder ideas.** Words that keep repeating among unsorted chats become suggested folders.
   Everything runs in the browser. No model and no network.
 - **Privacy looks.** You can hide a folder's name and keep only its color, blur its chat titles until you hover, or turn it into a vellum envelope.
-- **A tab that hangs from the top** of the page whenever Skin is closed: `skin · chat · claude code`. Switch to Claude Code
-  (or Codex on ChatGPT), do your work there, then press `chat` or `skin` to come back. If a chat is open on the page,
-  Skin opens it on paper. The same works after `open in Claude ↗`.
+- **A small `skin` tab hangs from the top** of the page whenever Skin is closed. Inside Skin, `chat · claude code` switches
+  to Claude Code (or Codex on ChatGPT). From there, `skin` brings you back. If a chat is open on the page, Skin opens it on
+  paper. The same works after `open in Claude ↗`.
 - **One board, both sites.** Chats from Claude and ChatGPT are stored together, and each chat opens on its own site.
 - **Same look as the [prototype](https://github.com/hey-niia/skin/tree/main/prototype):** 4 palettes (neon, kraft, fold, vellum),
   paper grain and fibres, folded corners, and an image on any folder. Fonts are Spline Sans Mono + Instrument Sans
