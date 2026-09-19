@@ -421,7 +421,17 @@
   }
 
   /* ---------------- folder ---------------- */
-  const moveOpts = (cur) => `<option value="">move…</option>` + S.folders.map((x) => `<option value="${esc(x.id)}" ${x.id === cur ? "disabled" : ""}>${esc(x.name)}</option>`).join("") + `<option value="__new">+ new folder…</option><option value="__auto">auto</option><option disabled>──────</option><option value="__delete">delete in ${esc(site.label)}…</option>`;
+  /* the move menu shows where the chat lives now ("work"), with that folder's color as a little square */
+  const moveOpts = (cur) => {
+    const inFolder = S.folders.some((x) => x.id === cur);
+    return (inFolder ? "" : `<option value="" selected>move…</option>`)
+      + S.folders.map((x) => `<option value="${esc(x.id)}" ${x.id === cur ? "selected" : ""}>${esc(x.name)}</option>`).join("")
+      + `<option disabled>──────</option><option value="__new">+ new folder…</option><option value="__auto">auto-sort</option><option disabled>──────</option><option value="__delete">delete in ${esc(site.label)}…</option>`;
+  };
+  const moveSelect = (key, cur) => {
+    const f = S.folders.find((x) => x.id === cur);
+    return `<span class="movewrap${f ? " placed" : ""}" style="${f ? `--mc:${colorOf(f)}` : ""}"><select data-move="${esc(key)}" data-cur="${esc(cur || "")}" aria-label="Folder — move chat">${moveOpts(cur)}</select></span>`;
+  };
   function folderHTML() {
     const { groups, how, ideas } = sort();
     const f = S.folders.find((x) => x.id === view.fid);
@@ -445,7 +455,7 @@
             <a href="${esc(x.path)}" data-chat="${esc(x.key)}"><span class="n">${list.length - i}</span>
               <span><span class="t">${esc(x.title)}</span><span class="d">${esc(day(x.seen))}${x.site !== SITE ? ` · ${esc(SITES[x.site].label)}` : x.kind === "code" ? ` · ${esc(site.codeLabel)}` : ""}${how[x.key] === "guess" ? " · ≈ guess" : ""}</span></span></a>
             ${how[x.key] === "guess" ? `<button class="ok" data-keep="${esc(x.key)}" data-to="${esc(f.id)}" title="Yes, it belongs here">✓</button>` : "<span></span>"}
-            <select data-move="${esc(x.key)}" aria-label="Move chat">${moveOpts(f?.id)}</select>
+            ${moveSelect(x.key, f?.id)}
             <button class="rm" data-hide="${esc(x.key)}" title="Remove from Skin" aria-label="Remove from Skin">×</button>
           </li>`).join("") || `<li class="none">empty</li>`}
         </ol>
@@ -468,7 +478,7 @@
         <header class="phead">
           <div><div class="kicker">${f ? (f.showName ? esc(f.name) : "●●●") : "new chat"}</div><h2>${esc(c?.title || view.title || "New chat")}</h2></div>
           <div class="pacts">
-            ${c ? `<select data-move="${esc(view.key)}" aria-label="Move chat">${moveOpts(fid)}</select>` : ""}
+            ${c ? moveSelect(view.key, fid) : ""}
             <button class="pbtn" data-native title="See it the usual way">open in ${esc(site.label)} ↗</button>
             ${c ? `<button class="pbtn danger" data-delete="${esc(view.key)}" title="Delete this chat in ${esc(site.label)}">delete</button>` : ""}
           </div>
@@ -724,7 +734,7 @@
     q("[data-nav]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); navigate(a.getAttribute("href")); }));
     q("[data-add]").forEach((b) => (b.onclick = () => addFolder()));
     q("[data-chat]").forEach((a) => (a.onclick = (e) => { e.preventDefault(); openChat(a.dataset.chat); }));
-    q("[data-move]").forEach((s) => (s.onchange = () => moveChat(s.dataset.move, s.value)));
+    q("[data-move]").forEach((s) => (s.onchange = () => { if (s.value !== s.dataset.cur) moveChat(s.dataset.move, s.value); }));
     q("[data-keep]").forEach((b) => (b.onclick = () => { S.chats[b.dataset.keep].folder = b.dataset.to; invalidate(); save(); renderView(); }));
     q("[data-idea]").forEach((b) => (b.onclick = () => addFolder(b.dataset.word, b.dataset.idea)));
     q("[data-rename]").forEach((b) => (b.onclick = renameFolder));
@@ -1191,6 +1201,9 @@ button{cursor:pointer;background:none;border:0}
 .ok{font:12px var(--mono);width:24px;height:24px;border:1px solid currentColor;opacity:.75}.ok:hover{opacity:1;background:var(--fg);color:var(--c)}
 .strip select{font:11px var(--mono);background:transparent;border:1px solid color-mix(in srgb,var(--fg) 35%,transparent);color:inherit;padding:4px 6px;max-width:110px}
 .strip select option{color:#111}
+.movewrap{position:relative;display:inline-flex;align-items:center}
+.movewrap.placed::before{content:"";position:absolute;left:7px;width:9px;height:11px;background:var(--mc);box-shadow:0 0 0 1px rgba(0,0,0,.25);pointer-events:none}
+.movewrap.placed select{padding-left:22px}
 .none{padding:14px 0;opacity:.7;font:12px var(--mono)}
 
 /* settings drawer */
