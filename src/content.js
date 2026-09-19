@@ -498,7 +498,7 @@
       <article class="paper" style="--c:${col};--fg:${fg}">
         <div class="tex"></div>
         <header class="phead">
-          <div><div class="kicker">${f ? (f.showName ? esc(f.name) : "●●●") : "new chat"}</div><h2>${esc(c?.title || view.title || "New chat")}</h2></div>
+          <div><h2>${esc(c?.title || view.title || "New chat")}</h2></div>
           <div class="pacts">
             ${c ? moveSelect(view.key, fid) : ""}
             <button class="pbtn" data-native title="See it the usual way">open in ${esc(site.label)} ↗</button>
