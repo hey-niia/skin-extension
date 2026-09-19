@@ -78,7 +78,26 @@
   const store = chrome.storage.local;
   const myRev = Math.random().toString(36).slice(2);
   let saveTimer;
-  const save = () => { clearTimeout(saveTimer); saveTimer = setTimeout(() => { S.rev = myRev + Date.now(); store.set({ skin: S }); }, 300); };
+  /* After the extension is reloaded or updated, tabs opened before keep running this
+   * old copy, which can no longer reach chrome.storage. Detect that and stand down. */
+  const alive = () => { try { return !!chrome.runtime?.id; } catch { return false; } };
+  let retired = false;
+  function retire() {
+    if (retired) return;
+    retired = true;
+    try { lifecycle.forEach((stop) => stop()); } catch {}
+    const tab = host.shadowRoot?.querySelector(".tab");
+    if (tab) { tab.innerHTML = `<button class="tskin" title="Skin was updated — reload this page">skin ↻</button>`; tab.querySelector("button").onclick = () => location.reload(); tab.style.display = ""; }
+  }
+  const lifecycle = [];
+  const save = () => {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(() => {
+      if (!alive()) return retire();
+      S.rev = myRev + Date.now();
+      store.set({ skin: S }).catch(() => { if (!alive()) retire(); });
+    }, 300);
+  };
 
   /* ---------------- helpers ---------------- */
   const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -140,7 +159,7 @@
    * 3. a guess learned from chats already in folders (word overlap, weighted by rarity)
    * 4. unsorted
    */
-  const STOP = new Set("the and for with how what why can you your from into about this that are was not but use using new help make best про для как что это або але щоб яка який які чи при від".split(" "));
+  const STOP = new Set("the and for with how what why can you your from into about this that are was not but use using new help make best про для как что это або але щоб яка який які чи при від question questions питання вопрос вопросы quick some any".split(" "));
   const stem = (w) => (w.length > 6 ? w.slice(0, 6) : w);
   const words = (t) => (t.toLowerCase().match(/[\p{L}\p{N}]+/gu) || []).filter((w) => w.length > 2 && !STOP.has(w));
   const tokens = (t) => [...new Set(words(t).map(stem))];
@@ -167,13 +186,15 @@
       for (const f of S.folders) { const re = matcher(f); if (re && re.test(c.title)) { where[c.key] = f.id; how[c.key] = "word"; break; } }
     }
     // learn word profiles from everything placed so far (hand-placed counts triple)
-    const df = {}, prof = {};
+    const df = {}, prof = {}, samples = {};
     for (const c of list) for (const t of tokens(c.title)) df[t] = (df[t] || 0) + 1;
     for (const c of list) {
       const fid = where[c.key]; if (!fid) continue;
       const w = how[c.key] === "hand" ? 3 : 1;
       const p = (prof[fid] ||= {});
       for (const t of tokens(c.title)) p[t] = (p[t] || 0) + w;
+      const sm = (samples[fid] ||= {});
+      for (const word of words(c.title)) { const t = stem(word); (sm[t] ||= {})[word] = (sm[t][word] || 0) + 1; }
     }
     const N = list.length || 1;
     for (const c of list) {
@@ -197,7 +218,19 @@
     }
     const ideas = Object.entries(freq).filter(([, n]) => n >= 2).sort((a, b) => b[1] - a[1]).slice(0, 6)
       .map(([s, n]) => ({ stem: s, n, word: Object.entries(sample[s]).sort((a, b) => b[1] - a[1])[0][0] }));
-    return (sorted = { groups, how, ideas });
+    return (sorted = { groups, how, ideas, prof, samples, df, N });
+  }
+
+  /* words a folder picked up from its chats (not yet in its own word list), strongest first */
+  function learnedFor(f) {
+    const { prof, samples, df, N } = sort();
+    const p = prof[f.id]; if (!p) return [];
+    const re = matcher(f);
+    return Object.entries(p)
+      .map(([t, w]) => ({ t, score: Math.log(1 + w) * Math.log(1 + N / (df[t] || 1)), word: Object.entries(samples[f.id]?.[t] || { [t]: 1 }).sort((a, b) => b[1] - a[1])[0][0] }))
+      .filter((x) => !/^\d+$/.test(x.t) && !(re && re.test(x.word)))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, 14);
   }
 
   /* ---------------- fonts (bundled, so the page's CSP can't block them) ---------------- */
@@ -945,6 +978,9 @@
               <div class="row">stack with <select data-k="group">${Object.entries(GROUPS).map(([g, v]) => `<option value="${g}" ${(f.group || "other") === g ? "selected" : ""}>${esc(v.name)}</option>`).join("")}</select></div>
               <label class="small">auto-sort words — comma separated, matched at the start of a word</label>
               <textarea rows="3" data-k="keywords">${esc(f.keywords)}</textarea>
+              ${(() => { const L = learnedFor(f); return L.length ? `<div class="learned"><span class="small">learned from your chats — tap to keep</span>
+                <div class="chips">${L.map((x) => `<button data-learn="${esc(x.t)}" title="adds “${esc(x.t)}” — matches every word that starts with it">+ ${esc(x.word)}</button>`).join("")}
+                <button class="all" data-learn-all>keep all</button></div></div>` : ""; })()}
               <button class="link danger" data-del>delete folder</button>
             </div></details>`).join("")}
           <button class="pill" data-add>+ new folder</button>
@@ -985,6 +1021,9 @@
       k("envelope").onclick = () => { f.envelope = !f.envelope; commit(); };
       k("keywords").onchange = (e) => { f.keywords = e.target.value; commit(); };
       k("group").onchange = (e) => { f.group = e.target.value; commit(); };
+      const keep = (stems) => { const have = new Set((f.keywords || "").split(",").map((w) => w.trim().toLowerCase()).filter(Boolean)); const add = stems.filter((x) => !have.has(x)); if (add.length) { f.keywords = [...have, ...add].join(", "); commit(); } };
+      el.querySelectorAll("[data-learn]").forEach((b) => (b.onclick = () => keep([b.dataset.learn])));
+      el.querySelector("[data-learn-all]")?.addEventListener("click", () => keep([...el.querySelectorAll("[data-learn]")].map((b) => b.dataset.learn)));
       k("custom").onchange = (e) => { f.custom = e.target.value; commit(); };
       el.querySelectorAll("[data-ci]").forEach((b) => (b.onclick = () => { f.ci = +b.dataset.ci; delete f.custom; commit(); }));
       k("image").onchange = async (e) => {
@@ -1024,9 +1063,12 @@
   const isHome = () => site.home.includes(location.pathname);
   let lastUrl = location.href;
   function onUrl() { scan(); if (S.openOnHome && isHome() && !isOpen()) toggle(true); }
-  new MutationObserver(scheduleScan).observe(document.body, { childList: true, subtree: true });
+  const pageObs = new MutationObserver(() => (alive() ? scheduleScan() : retire()));
+  pageObs.observe(document.body, { childList: true, subtree: true });
+  lifecycle.push(() => pageObs.disconnect(), () => stopReader());
   let resizeT; addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { if (isOpen() && view.name !== "folder") renderView(); }, 150); });
-  setInterval(() => { if (location.href !== lastUrl) { lastUrl = location.href; onUrl(); } }, 700);
+  const urlTimer = setInterval(() => { if (!alive()) return retire(); if (location.href !== lastUrl) { lastUrl = location.href; onUrl(); } }, 700);
+  lifecycle.push(() => clearInterval(urlTimer));
   chrome.storage.onChanged.addListener((ch, area) => {
     const nv = ch.skin?.newValue;
     if (area !== "local" || !nv || nv.rev?.startsWith(myRev)) return; // ignore our own writes
@@ -1061,7 +1103,7 @@
     return best;
   }
 
-  store.get("skin").then((r) => {
+  store.get("skin").catch(() => ({})).then((r) => {
     if (r.skin) { S = migrate({ ...structuredClone(DEFAULT_STATE), ...r.skin, v: r.skin.v || 1 }); save(); }
     const del = sessionStorage.getItem("skin-delete");
     if (del) {
@@ -1229,6 +1271,11 @@ input[type=range]{accent-color:#e9e5dc;width:150px}
 .imgrow label,.imgrow button{font-size:11px;padding:6px 10px;border:1px solid var(--line);cursor:pointer;color:var(--muted)}
 .imgrow input{display:none}
 .small{font-size:11px;color:var(--muted);line-height:1.45}
+.learned{display:flex;flex-direction:column;gap:6px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chips button{font:11px var(--mono);padding:3px 8px;border:1px dashed rgba(255,255,255,.28);color:#d8d3c8}
+.chips button:hover{border-style:solid;border-color:#e9e5dc;color:#fff}
+.chips .all{border-style:solid;color:var(--muted)}
 .link{font-size:11px;text-decoration:underline;text-align:left;color:var(--muted)}.danger:hover{color:#E2623D}
 
 /* adaptive board: sheet size comes from --tile */

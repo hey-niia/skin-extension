@@ -30,6 +30,8 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
   1. **Words.** Each folder has a list of word stems (English, Ukrainian, Russian), which you can edit in settings.
   2. **Your moves.** A chat you move by hand teaches Skin. Chats with similar words follow it into the
      same folder, marked `≈ guess`, and one click on ✓ confirms the guess.
+  In settings, each folder shows the words it has **learned from your chats**. Tap one (or *keep all*) to add it to that
+  folder's word list for good.
   3. **New folder ideas.** Words that keep repeating among unsorted chats become suggested folders.
   Everything runs in the browser. No model and no network.
 - **Privacy looks.** You can hide a folder's name and keep only its color, blur its chat titles until you hover, or turn it into a vellum envelope.

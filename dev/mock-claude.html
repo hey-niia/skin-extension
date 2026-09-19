@@ -140,10 +140,11 @@
     setTimeout(() => reply(id, text), 300);
   };
 </script>
-<script src="chrome-shim.js"></script>
 <script>
-  // always load the latest content script while developing
-  const cs = document.createElement("script"); cs.src = "../src/content.js?" + Date.now(); document.body.appendChild(cs);
+  // always load the latest shim + content script while developing
+  const shim = document.createElement("script"); shim.src = "chrome-shim.js?" + Date.now();
+  shim.onload = () => { const cs = document.createElement("script"); cs.src = "../src/content.js?" + Date.now(); document.body.appendChild(cs); };
+  document.body.appendChild(shim);
 </script>
 </body>
 </html>
