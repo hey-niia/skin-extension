@@ -421,7 +421,7 @@
   }
 
   /* ---------------- folder ---------------- */
-  const moveOpts = (cur) => `<option value="">move…</option>` + S.folders.map((x) => `<option value="${esc(x.id)}" ${x.id === cur ? "disabled" : ""}>${esc(x.name)}</option>`).join("") + `<option value="__new">+ new folder…</option><option value="__auto">auto</option>`;
+  const moveOpts = (cur) => `<option value="">move…</option>` + S.folders.map((x) => `<option value="${esc(x.id)}" ${x.id === cur ? "disabled" : ""}>${esc(x.name)}</option>`).join("") + `<option value="__new">+ new folder…</option><option value="__auto">auto</option><option disabled>──────</option><option value="__delete">delete in ${esc(site.label)}…</option>`;
   function folderHTML() {
     const { groups, how, ideas } = sort();
     const f = S.folders.find((x) => x.id === view.fid);
@@ -470,6 +470,7 @@
           <div class="pacts">
             ${c ? `<select data-move="${esc(view.key)}" aria-label="Move chat">${moveOpts(fid)}</select>` : ""}
             <button class="pbtn" data-native title="See it the usual way">open in ${esc(site.label)} ↗</button>
+            ${c ? `<button class="pbtn danger" data-delete="${esc(view.key)}" title="Delete this chat in ${esc(site.label)}">delete</button>` : ""}
           </div>
         </header>
         <div class="msgs" aria-live="polite"><p class="waiting">opening…</p></div>
@@ -630,6 +631,57 @@
     if (view.name === "read" && view.key === key) startReader();
   }
 
+  /* ---------------- deleting a chat in the site ----------------
+   * Deleting can't be undone, so Skin never does it on its own: it opens the chat,
+   * opens the site's own Delete dialog, and you press the final Delete there.
+   * No hidden API calls.
+   */
+  const MENU_TRIGGER = '[data-testid="chat-menu-trigger"], [data-testid="conversation-options-button"], button[aria-label*="chat options" i], button[aria-label*="conversation options" i]';
+  function press(el) {
+    const o = { bubbles: true, cancelable: true, button: 0, pointerType: "mouse", isPrimary: true };
+    el.dispatchEvent(new PointerEvent("pointerdown", o)); el.dispatchEvent(new MouseEvent("mousedown", o));
+    el.dispatchEvent(new PointerEvent("pointerup", o)); el.dispatchEvent(new MouseEvent("mouseup", o));
+    el.click();
+  }
+  async function deleteInSite(key) {
+    const c = S.chats[key];
+    if (!c || c.site !== SITE) { toast(`Open ${SITES[c?.site]?.label || "that site"} to delete this chat`); return; }
+    if (!confirm(`Delete “${c.title}” in ${site.label}?\n\nSkin will open ${site.label}'s own Delete dialog — you confirm there. Deleting can't be undone.`)) return;
+    const wasListed = [...document.querySelectorAll("a[href]")].some((a) => a.getAttribute("href") === c.path);
+    toggle(false);
+    if (location.pathname !== c.path) {
+      const a = [...document.querySelectorAll("a[href]")].find((x) => x.getAttribute("href") === c.path);
+      if (a) a.click();
+      else { sessionStorage.setItem("skin-delete", key); location.assign(c.path); return; }
+      if (!(await waitFor(() => location.pathname === c.path, 5000))) { toast("Couldn't open that chat"); return; }
+    }
+    await openDeleteDialog(key, wasListed);
+  }
+  async function openDeleteDialog(key, wasListed) {
+    const trigger = await waitFor(() => [...document.querySelectorAll(MENU_TRIGGER)].find(visible), 6000);
+    let item = null;
+    if (trigger) {
+      press(trigger);
+      item = await waitFor(() => [...document.querySelectorAll('[role="menuitem"]')].find((el) => visible(el) && /^\s*delete\b/i.test(el.textContent)), 3000);
+    }
+    if (item) { press(item); toast(`Press Delete in ${site.label}'s dialog to finish`, 6000); }
+    else toast(`Open the chat's menu (its title ▾) and choose Delete`, 8000);
+    watchDeletion(key, wasListed);
+  }
+  /* once the site has deleted it (the chat's link vanishes, or you land on a new chat), hide it here too */
+  function watchDeletion(key, wasListed) {
+    const c = S.chats[key], start = Date.now();
+    const iv = setInterval(() => {
+      const listed = [...document.querySelectorAll("a[href]")].some((a) => a.getAttribute("href") === c.path);
+      const left = location.pathname !== c.path;
+      if (left && (wasListed ? !listed : isHome())) {
+        clearInterval(iv);
+        c.hidden = true; c.deleted = true; invalidate(); save();
+        toast(`Deleted in ${site.label}`);
+      } else if (left || Date.now() - start > 120000) clearInterval(iv);
+    }, 800);
+  }
+
   /* ---------------- render ---------------- */
   function renderView(enter = false) {
     renderBar();
@@ -651,7 +703,8 @@
       const name = prompt("New folder name");
       if (!name?.trim()) { renderView(); return; }
       c.folder = addFolder(name.trim(), "", { quiet: true });
-    } else if (value === "__auto") delete c.folder;
+    } else if (value === "__delete") { renderView(); deleteInSite(key); return; }
+    else if (value === "__auto") delete c.folder;
     else if (value) c.folder = value;
     invalidate(); save(); renderView();
   }
@@ -680,6 +733,7 @@
       toast(`Removed “${c.title.slice(0, 40)}” from Skin — it's still in ${site.label}`, 5000, () => { c.hidden = false; invalidate(); save(); renderView(); });
     }));
     q("[data-native]").forEach((b) => (b.onclick = () => toggle(false)));
+    q("[data-delete]").forEach((b) => (b.onclick = () => deleteInSite(b.dataset.delete)));
   }
   function addFolder(name = "new folder", kw = "", { quiet = false } = {}) {
     const id = "f" + Date.now().toString(36);
@@ -903,7 +957,7 @@
           <p class="small">Skin reads only chat titles and links already shown on this page. It never calls ${esc(site.label)}'s API and sends nothing anywhere.</p>
           <div class="row"><span class="small">${Object.keys(S.chats).length} chats remembered</span><button class="pill" data-forget>forget chats</button></div>
           ${(() => { const n = Object.values(S.chats).filter((c) => c.hidden).length; return n ? `<div class="row"><span class="small">${n} removed from the board</span><button class="pill" data-unhide>show again</button></div>` : ""; })()}
-          <p class="small">× on a chat only removes it from Skin. To delete it for good, open it in ${esc(site.label)} and delete it there.</p>
+          <p class="small">× on a chat only removes it from Skin. “delete in ${esc(site.label)}…” (in the move menu, or on the paper) opens ${esc(site.label)}'s own Delete dialog — the final click is always yours.</p>
         </div>
       </div>`;
     drawer.querySelector(".body").scrollTop = scroll;
@@ -1010,6 +1064,11 @@
 
   store.get("skin").then((r) => {
     if (r.skin) { S = migrate({ ...structuredClone(DEFAULT_STATE), ...r.skin, v: r.skin.v || 1 }); save(); }
+    const del = sessionStorage.getItem("skin-delete");
+    if (del) {
+      sessionStorage.removeItem("skin-delete");
+      if (S.chats[del]?.path === location.pathname) { setTimeout(() => openDeleteDialog(del, false), 1200); return; }
+    }
     if (sessionStorage.getItem("skin-open")) { sessionStorage.removeItem("skin-open"); setTimeout(() => toggle(true), 600); return; }
     const pending = sessionStorage.getItem("skin-read");
     if (pending) {
@@ -1227,6 +1286,7 @@ input[type=range]{accent-color:#e9e5dc;width:150px}
 .pacts select,.pbtn{font:11px var(--mono);background:transparent;border:1px solid color-mix(in srgb,var(--fg) 35%,transparent);color:inherit;padding:5px 8px}
 .pacts select option{color:#111}
 .pbtn:hover{background:var(--fg);color:var(--c)}
+.pbtn.danger:hover{background:#9b2c14;color:#fff;border-color:#9b2c14}
 .msgs{padding:18px 30px 6px;display:flex;flex-direction:column;gap:22px}
 .waiting{font:12px var(--mono);opacity:.6}
 .m .who{font:10.5px var(--mono);opacity:.6;margin-bottom:6px;text-transform:lowercase}

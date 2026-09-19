@@ -22,6 +22,17 @@
 <body>
 <nav id="side"><a href="/new" id="newchat"><b>+ New chat</b></a><b>Recents</b></nav>
 <div class="page">
+  <div style="position:relative;align-self:stretch;display:flex;justify-content:center">
+    <button data-testid="chat-menu-trigger" id="menuBtn" style="background:none;border:1px solid #ccc;border-radius:8px;padding:4px 10px">chat title ▾</button>
+    <div role="menu" id="menu" hidden style="position:absolute;top:32px;background:#fff;border:1px solid #ddd;border-radius:8px;padding:4px;z-index:5">
+      <div role="menuitem" style="padding:6px 12px">Rename</div>
+      <div role="menuitem" id="delItem" style="padding:6px 12px;color:#b00">Delete</div>
+    </div>
+  </div>
+  <div role="dialog" id="dlg" hidden style="position:fixed;inset:0;background:rgba(0,0,0,.3);display:grid;place-items:center">
+    <div style="background:#fff;padding:20px;border-radius:12px">Delete chat? This can't be undone.<br><br>
+      <button id="dlgCancel">Cancel</button> <button id="dlgOk" style="background:#b00;color:#fff;border:0;padding:6px 12px;border-radius:6px">Delete</button></div>
+  </div>
   <div id="thread">Mock of a chat site — for testing the Skin content script.</div>
   <div id="files"></div>
   <div class="box">
@@ -86,6 +97,18 @@
       m.html = "<p>" + words.slice(0, ++i).join(" ") + "</p>"; el.innerHTML = m.html;
     }, 90);
   }
+
+  // chat menu → Delete → confirm dialog (Radix-style: opens on pointerdown)
+  const menu = document.getElementById("menu"), dlg = document.getElementById("dlg");
+  document.getElementById("menuBtn").addEventListener("pointerdown", () => { if (/^\/chat\//.test(location.pathname)) menu.hidden = !menu.hidden; });
+  document.getElementById("delItem").onclick = () => { menu.hidden = true; dlg.hidden = false; };
+  document.getElementById("dlgCancel").onclick = () => { dlg.hidden = true; };
+  document.getElementById("dlgOk").onclick = () => {
+    dlg.hidden = true;
+    const path = location.pathname;
+    document.querySelector(`nav a[href="${path}"]`)?.remove();
+    history.pushState({}, "", "/new"); thread.innerHTML = "";
+  };
 
   // like the real site: start typing anywhere and the site's own editor grabs focus
   document.addEventListener("keydown", (e) => {

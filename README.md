@@ -20,7 +20,9 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
   paper, so nothing is downloaded again. Click a picture to see it large. Thinking and tool steps are shown as tiny notes.
   `open in Claude ↗` shows the usual view (for artifacts and so on).
 - **Folders and chats.** Rename a folder by clicking its title. Move a chat to any folder, or to a new one
-  (`+ new folder…`). `×` removes a chat from Skin, with undo. It stays in Claude, and you delete it for good there.
+  (`+ new folder…`). `×` removes a chat from Skin, with undo.
+  **Delete in Claude…** (in the move menu, or `delete` on the paper) opens the chat and Claude's own Delete dialog.
+  The final, irreversible click is always yours. Skin makes no API calls to delete anything.
 - **Sheets that fit.** The more folders you have, the smaller the sheets get, so the whole board fits above the chat box.
   When the sheets get too small to read, folders that mean similar things stack into piles (paperwork,
   work & making, mind, living). Stacking can be set to `auto`, `on` or `off`.
