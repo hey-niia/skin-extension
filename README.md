@@ -8,40 +8,12 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
 
 ## What it does
 
-- **Board of folders, chat box below.** Opens on the home page, or with the `skin` tab at the top (`Alt+Shift+S`).
-  Type in the paper chat box at the bottom and add photos or files (＋, paste, or drag in). Skin opens a new chat on the
-  site, drops your message and files into the site's own chat box, and presses send. Models, tools, projects and
-  history work as usual. You can pick a folder for the new chat, or leave it on `auto`. Turn off *send right away*
-  if you want to pick a model before sending.
-- **Read and reply on paper.** Open a chat from a folder and it's printed on a sheet in that folder's color: your
-  messages, the model's answers (with lists, code and tables), and replies streaming in live. Reply from the chat box at
-  the bottom. Skin copies the text from the site's page into its own simple markup, and never uses the site's HTML.
-  Pictures in answers and rows of web results show up too. Skin paints the page's own, already-loaded images onto the
-  paper, so nothing is downloaded again. Click a picture to see it large. Thinking and tool steps are shown as tiny notes.
-  `open in Claude ↗` shows the usual view (for artifacts and so on).
-- **Folders and chats.** Rename a folder by clicking its title. Move a chat to any folder, or to a new one
-  (`+ new folder…`). `×` removes a chat from Skin, with undo.
-  **Delete in Claude…** (in the move menu, or `delete` on the paper) opens the chat and Claude's own Delete dialog.
-  The final, irreversible click is always yours. Skin makes no API calls to delete anything.
-- **Sheets that fit.** The more folders you have, the smaller the sheets get, so the whole board fits above the chat box.
-  When the sheets get too small to read, folders that mean similar things stack into piles (paperwork,
-  work & making, mind, living). Stacking can be set to `auto`, `on` or `off`.
-- **Auto-sort, in three steps:**
-  1. **Words.** Each folder has a list of word stems (English, Ukrainian, Russian), which you can edit in settings.
-  2. **Your moves.** A chat you move by hand teaches Skin. Chats with similar words follow it into the
-     same folder, marked `≈ guess`, and one click on ✓ confirms the guess.
-  In settings, each folder shows the words it has **learned from your chats**. Tap one (or *keep all*) to add it to that
-  folder's word list for good.
-  3. **New folder ideas.** Words that keep repeating among unsorted chats become suggested folders.
-  Everything runs in the browser. No model and no network.
-- **Privacy looks.** You can hide a folder's name and keep only its color, blur its chat titles until you hover, or turn it into a vellum envelope.
-- **A small `skin` tab hangs from the top** of the page whenever Skin is closed. Inside Skin, `chat · claude code` switches
-  to Claude Code (or Codex on ChatGPT). From there, `skin` brings you back. If a chat is open on the page, Skin opens it on
-  paper. The same works after `open in Claude ↗`.
-- **One board, both sites.** Chats from Claude and ChatGPT are stored together, and each chat opens on its own site.
-- **Same look as the [prototype](https://github.com/hey-niia/skin/tree/main/prototype):** 4 palettes (neon, kraft, fold, vellum),
-  paper grain and fibres, folded corners, and an image on any folder. Fonts are Spline Sans Mono + Instrument Sans
-  (SIL Open Font License), bundled in `fonts/`. The textures are rebuilt with `python3 dev/make-textures.py`.
+- **Folders** — your chats, sorted onto sheets of paper
+- **Auto-sort** — by words, learns from your moves
+- **Private** — hide names, blur titles, seal in envelopes
+- **Chat** — write, attach photos, read and reply on paper
+- **Switch** — chat ⇄ Claude Code, one small `skin` tab
+- **Local** — no servers, no API calls, nothing leaves your browser
 
 ## Privacy
 
