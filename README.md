@@ -1,6 +1,8 @@
 # Skin
 
-A private, local-first skin for your LLM. Think Winamp skins, but for Claude and ChatGPT.
+A private skin for your LLM. Think Winamp skins, but for Claude and ChatGPT.
+
+**Browser-only:** no servers, no accounts, no API calls.
 
 Instead of the default chat UI, you see your own board. Every conversation is sorted into a folder, and every folder
 is a sheet of paper you style yourself: color, image, label, or no label at all.
@@ -14,7 +16,6 @@ Sister project: [skin](https://github.com/hey-niia/skin), a standalone app with 
 - **Private** — hide names, blur titles, seal in envelopes
 - **Chat** — write, attach photos, read and reply on paper
 - **Switch** — chat ⇄ Claude Code, one small `skin` tab
-- **Local** — no servers, no API calls, nothing leaves your browser
 
 ## Privacy
 
