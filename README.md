@@ -54,7 +54,8 @@ To collect older chats, open **Recents** on Claude (or scroll the ChatGPT sideba
 
 ## Install (Chrome, Arc, Edge, Brave)
 
-1. Download this repo (`Code → Download ZIP`, then unzip), or `git clone` it.
+1. Download `skin-extension-vX.Y.Z.zip` from the [latest release](https://github.com/hey-niia/skin-extension/releases/latest) and unzip it.
+   You can also `git clone` this repo.
 2. Open `chrome://extensions` and turn on **Developer mode** (top right).
 3. Click **Load unpacked** and choose the `skin-extension` folder.
 4. Open claude.ai or chatgpt.com.
@@ -76,3 +77,9 @@ python3 -m http.server 5179
 - Auto-sort uses words and your moves, not a language model.
 - Anthropic's and OpenAI's consumer terms restrict automated access. Skin only reads what's already
   on the page and never fetches data in the background.
+
+## Credits
+
+- Fonts: [Spline Sans Mono](https://github.com/SorkinType/SplineSansMono) and [Instrument Sans](https://github.com/Instrument/instrument-sans),
+  both under the SIL Open Font License 1.1 (see `fonts/OFL-*.txt`).
+- Skin is an independent project. It is not affiliated with or endorsed by Anthropic or OpenAI.
